@@ -341,24 +341,41 @@ export function createOrchestrator(options: { dataDir: string }): Orchestrator {
     },
 
     async listenForResponse(timeoutMs: number): Promise<Record<string, unknown>> {
-      // Play a subtle listening indicator tone so the user knows we're ready
-      if (playback && !playback.isPlaying()) {
-        const sampleRate = 24000;
-        const duration = 0.15; // 150ms
-        const freq = 880; // A5 note
-        const samples = new Float32Array(Math.round(sampleRate * duration));
-        for (let i = 0; i < samples.length; i++) {
-          const t = i / sampleRate;
-          const envelope = Math.min(1, (samples.length - i) / (sampleRate * 0.05)); // fade out
-          samples[i] = Math.sin(2 * Math.PI * freq * t) * 0.15 * envelope;
+      // Warm sine chime via SoX synth — much richer than raw waveform
+      if (!playback?.isPlaying()) {
+        try {
+          const { spawnSync } = await import('node:child_process');
+          spawnSync('play', [
+            '-q', '-n',
+            'synth', '0.2', 'sine', '1400',
+            'fade', 't', '0', '0.2', '0.15',
+            'tremolo', '20',
+            'vol', '0.03',
+          ], { stdio: 'ignore', timeout: 2000 });
+        } catch {
+          // Chime is non-critical — don't block on failure
         }
-        await playback.play(samples, sampleRate);
       }
 
       const entry = await queue.waitForNext(timeoutMs);
       if (entry === null) {
         return { heard: false, reason: 'timeout', listeningMode: queue.getMode(), paused: queue.isPaused() };
       }
+
+      // "Received" chime — lower tone confirms message was captured
+      try {
+        const { spawnSync } = await import('node:child_process');
+        spawnSync('play', [
+          '-q', '-n',
+          'synth', '0.12', 'sine', '1000',
+          'fade', 't', '0', '0.12', '0.08',
+          'tremolo', '15',
+          'vol', '0.08',
+        ], { stdio: 'ignore', timeout: 2000 });
+      } catch {
+        // Non-critical
+      }
+
       // Handle trigger phrases
       if (entry.text === '__jarvis_pause__') {
         return { heard: true, text: '__jarvis_pause__', paused: true, listeningMode: queue.getMode() };

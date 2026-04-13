@@ -32,7 +32,7 @@ export interface CreateTranscriptionQueueOptions {
 export function createTranscriptionQueue(options: CreateTranscriptionQueueOptions): TranscriptionQueue {
   const { maxDepth } = options;
   const wakeWord = (options.wakeWord ?? 'jarvis').toLowerCase();
-  const silenceGapMs = options.silenceGapMs ?? 3000;
+  const silenceGapMs = options.silenceGapMs ?? 3500;
   const log: ScopedLogger = options.logger.scope('pipeline:queue');
   const entries: TranscriptionEntry[] = [];
 
