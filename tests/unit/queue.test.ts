@@ -64,6 +64,30 @@ describe('TranscriptionQueue', () => {
     expect(entry).toBeNull();
   });
 
+  it('accumulates segments up to max limit of 20', async () => {
+    const queue = createTranscriptionQueue({
+      maxDepth: 50,
+      logger: makeLogger(),
+      silenceGapMs: 100,
+    });
+    queue.setMode('active');
+
+    // Push 25 entries rapidly — only 20 should be accumulated due to safety limit
+    const waitPromise = queue.waitForNext(5000);
+
+    // Push first entry to start accumulation, then push more before silence gap
+    queue.push(makeEntry('seg-0'));
+    for (let i = 1; i <= 24; i++) {
+      setTimeout(() => queue.push(makeEntry(`seg-${i}`)), i * 5);
+    }
+
+    const entry = await waitPromise;
+    expect(entry).not.toBeNull();
+    // Should have accumulated exactly 20 segments (the safety limit)
+    const segCount = entry!.text.split(' ').length;
+    expect(segCount).toBe(20);
+  });
+
   it('pops existing entry immediately from waitForNext', async () => {
     const queue = createTranscriptionQueue({ maxDepth: 10, logger: makeLogger() });
     queue.setMode('active');

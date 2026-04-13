@@ -198,8 +198,9 @@ export type ToolHandlers = Record<
 export function createToolHandlers(ctx: ToolContext): ToolHandlers {
   return {
     async ListenForResponse(params) {
-      const timeoutMs =
+      const raw =
         typeof params.timeout_ms === 'number' ? params.timeout_ms : 30_000;
+      const timeoutMs = Math.min(120_000, Math.max(1_000, raw));
       return ctx.listenForResponse(timeoutMs);
     },
 

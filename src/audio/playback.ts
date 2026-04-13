@@ -1,5 +1,5 @@
 import { spawn, type ChildProcess } from 'node:child_process';
-import { writeFileSync, unlinkSync, mkdtempSync } from 'node:fs';
+import { writeFileSync, unlinkSync, mkdtempSync, rmdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { Logger, ScopedLogger } from '../logging/logger.js';
@@ -157,6 +157,7 @@ export function createAudioPlayback(options: PlaybackOptions): AudioPlayback {
       }
       destroyed = true;
       try { unlinkSync(tempFile); } catch { /* ignore */ }
+      try { rmdirSync(tempDir); } catch { /* ignore */ }
       log.info('playback destroyed');
     },
   };

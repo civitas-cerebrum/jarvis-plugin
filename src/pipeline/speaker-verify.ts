@@ -4,6 +4,8 @@ export interface VerificationResult {
 }
 
 export function cosineSimilarity(a: Float32Array, b: Float32Array): number {
+  if (a.length !== b.length) return 0;
+
   let dot = 0;
   let normA = 0;
   let normB = 0;

@@ -6,7 +6,7 @@ const dataDir = process.env.JARVIS_DATA || process.env.CLAUDE_PLUGIN_DATA || './
 async function main(): Promise<void> {
   process.stderr.write(`[jarvis] Starting with dataDir: ${dataDir}\n`);
   const orchestrator = createOrchestrator({ dataDir });
-  initMcpServer(orchestrator);
+  initMcpServer(orchestrator, () => orchestrator.destroy());
 
   try {
     await orchestrator.start();

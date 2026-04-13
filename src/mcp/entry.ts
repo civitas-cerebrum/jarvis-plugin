@@ -31,7 +31,7 @@ function send(msg: JsonRpcResponse): void {
   }
 }
 
-export function initMcpServer(ctx: ToolContext): void {
+export function initMcpServer(ctx: ToolContext, cleanup?: () => void): void {
   const handlers: ToolHandlers = createToolHandlers(ctx);
 
   const rl = createInterface({ input: process.stdin, terminal: false });
@@ -46,6 +46,7 @@ export function initMcpServer(ctx: ToolContext): void {
 
   rl.on('close', () => {
     process.stderr.write('[jarvis] stdin closed, shutting down\n');
+    cleanup?.();
     process.exit(0);
   });
 

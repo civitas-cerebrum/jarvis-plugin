@@ -199,12 +199,13 @@ export function createTranscriptionQueue(options: CreateTranscriptionQueueOption
 
     // Accumulate: wait for a silence gap before returning
     const accumulated: TranscriptionEntry[] = [first];
+    const MAX_ACCUMULATION = 20; // Safety limit to prevent unbounded accumulation
 
-    const collectMore = (): Promise<void> =>
-      new Promise<void>((resolve) => {
+    while (accumulated.length < MAX_ACCUMULATION) {
+      const shouldContinue = await new Promise<boolean>((resolve) => {
         const gapTimer = setTimeout(() => {
           waiter = null;
-          resolve(); // Silence gap reached — done accumulating
+          resolve(false); // Silence gap reached — done accumulating
         }, silenceGapMs);
 
         waiter = (entry: TranscriptionEntry | null) => {
@@ -213,19 +214,19 @@ export function createTranscriptionQueue(options: CreateTranscriptionQueueOption
             // Trigger phrases break accumulation immediately
             if (entry.text === '__jarvis_pause__' || entry.text === '__jarvis_resume__') {
               entries.unshift(entry); // Put it back for next call
-              resolve();
+              resolve(false);
               return;
             }
             accumulated.push(entry);
-            // Wait for more
-            collectMore().then(resolve);
+            resolve(true); // Continue accumulating
           } else {
-            resolve();
+            resolve(false);
           }
         };
       });
 
-    await collectMore();
+      if (!shouldContinue) break;
+    }
 
     // Merge accumulated entries
     const merged: TranscriptionEntry = {

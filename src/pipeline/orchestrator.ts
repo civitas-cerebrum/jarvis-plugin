@@ -81,6 +81,7 @@ export function createOrchestrator(options: { dataDir: string }): Orchestrator {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let denoiser: any = null;
   let pipelineReady = false;
+  // isSpeaking tracks TTS playback state — could be used as echo cancellation guard
   let isSpeaking = false;
 
   const stats: SessionStats = {
@@ -323,6 +324,7 @@ export function createOrchestrator(options: { dataDir: string }): Orchestrator {
       embeddingExtractor = null;
       playback = null;
       passiveRefiner = null;
+      denoiser = null;
       pipelineReady = false;
       log.info('Orchestrator destroyed');
     },
@@ -337,21 +339,23 @@ export function createOrchestrator(options: { dataDir: string }): Orchestrator {
         consecutiveRejections: stats.consecutiveRejections,
         listeningMode: queue.getMode(),
         paused: queue.isPaused(),
+        isSpeaking,
       };
     },
 
     async listenForResponse(timeoutMs: number): Promise<Record<string, unknown>> {
-      // Warm sine chime via SoX synth — much richer than raw waveform
+      // Warm sine chime via SoX synth — much richer than raw waveform (fire-and-forget)
       if (!playback?.isPlaying()) {
         try {
-          const { spawnSync } = await import('node:child_process');
-          spawnSync('play', [
+          const { spawn } = await import('node:child_process');
+          const chimeProc = spawn('play', [
             '-q', '-n',
             'synth', '0.2', 'sine', '1400',
             'fade', 't', '0', '0.2', '0.15',
             'tremolo', '20',
             'vol', '1.0',
-          ], { stdio: 'ignore', timeout: 2000 });
+          ], { stdio: 'ignore' });
+          chimeProc.on('error', () => { /* non-critical */ });
         } catch {
           // Chime is non-critical — don't block on failure
         }
@@ -362,16 +366,21 @@ export function createOrchestrator(options: { dataDir: string }): Orchestrator {
         return { heard: false, reason: 'timeout', listeningMode: queue.getMode(), paused: queue.isPaused() };
       }
 
-      // "Received" chime — lower tone confirms message was captured
+      // "Received" chime — lower tone confirms message was captured (brief await)
       try {
-        const { spawnSync } = await import('node:child_process');
-        spawnSync('play', [
-          '-q', '-n',
-          'synth', '0.12', 'sine', '1000',
-          'fade', 't', '0', '0.12', '0.08',
-          'tremolo', '15',
-          'vol', '1.0',
-        ], { stdio: 'ignore', timeout: 2000 });
+        const { spawn } = await import('node:child_process');
+        await new Promise<void>((resolve) => {
+          const chimeProc = spawn('play', [
+            '-q', '-n',
+            'synth', '0.12', 'sine', '1000',
+            'fade', 't', '0', '0.12', '0.08',
+            'tremolo', '15',
+            'vol', '1.0',
+          ], { stdio: 'ignore' });
+          const timeout = setTimeout(() => resolve(), 2000);
+          chimeProc.on('close', () => { clearTimeout(timeout); resolve(); });
+          chimeProc.on('error', () => { clearTimeout(timeout); resolve(); });
+        });
       } catch {
         // Non-critical
       }
@@ -520,6 +529,7 @@ export function createOrchestrator(options: { dataDir: string }): Orchestrator {
       }
       saveProfileToDisk(dataDir, composite);
       voiceProfile = composite;
+      enrollmentSession = null;
       log.info('Voice profile saved from enrollment');
       return { saved: true };
     },

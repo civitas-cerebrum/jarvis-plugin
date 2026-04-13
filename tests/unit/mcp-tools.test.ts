@@ -77,6 +77,20 @@ describe('createToolHandlers', () => {
     expect(ctx.listenForResponse).toHaveBeenCalledWith(30_000);
   });
 
+  it('ListenForResponse clamps timeout_ms below 1000 to 1000', async () => {
+    const ctx = createMockContext();
+    const handlers = createToolHandlers(ctx);
+    await handlers.ListenForResponse({ timeout_ms: 100 });
+    expect(ctx.listenForResponse).toHaveBeenCalledWith(1_000);
+  });
+
+  it('ListenForResponse clamps timeout_ms above 120000 to 120000', async () => {
+    const ctx = createMockContext();
+    const handlers = createToolHandlers(ctx);
+    await handlers.ListenForResponse({ timeout_ms: 999_999 });
+    expect(ctx.listenForResponse).toHaveBeenCalledWith(120_000);
+  });
+
   it('SpeakText handler delegates with text', async () => {
     const ctx = createMockContext();
     const handlers = createToolHandlers(ctx);

@@ -22,6 +22,18 @@ describe('cosineSimilarity', () => {
     const b = new Float32Array([-1, 0]);
     expect(cosineSimilarity(a, b)).toBeCloseTo(-1.0, 5);
   });
+
+  it('returns 0 for mismatched lengths', () => {
+    const a = new Float32Array([1, 2, 3]);
+    const b = new Float32Array([1, 2]);
+    expect(cosineSimilarity(a, b)).toBe(0);
+  });
+
+  it('returns 0 for empty vs non-empty vectors', () => {
+    const a = new Float32Array([]);
+    const b = new Float32Array([1, 2]);
+    expect(cosineSimilarity(a, b)).toBe(0);
+  });
 });
 
 describe('isVerifiedSpeaker', () => {
