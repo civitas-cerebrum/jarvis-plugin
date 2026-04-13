@@ -25,11 +25,14 @@ export interface CreateTranscriptionQueueOptions {
   maxDepth: number;
   logger: Logger;
   wakeWord?: string;
+  /** Silence gap (ms) before returning accumulated speech. Default: 3000 */
+  silenceGapMs?: number;
 }
 
 export function createTranscriptionQueue(options: CreateTranscriptionQueueOptions): TranscriptionQueue {
   const { maxDepth } = options;
   const wakeWord = (options.wakeWord ?? 'jarvis').toLowerCase();
+  const silenceGapMs = options.silenceGapMs ?? 3000;
   const log: ScopedLogger = options.logger.scope('pipeline:queue');
   const entries: TranscriptionEntry[] = [];
 
@@ -166,26 +169,80 @@ export function createTranscriptionQueue(options: CreateTranscriptionQueueOption
   }
 
   async function waitForNext(timeoutMs: number): Promise<TranscriptionEntry | null> {
+    // Wait for the first entry
+    let first: TranscriptionEntry | null = null;
+
     if (entries.length > 0) {
-      const entry = entries.shift()!;
-      log.debug('waitForNext: returning existing entry', { text: entry.text, depth: entries.length });
-      return entry;
+      first = entries.shift()!;
+    } else {
+      log.debug('waitForNext: waiting for first entry', { timeoutMs });
+      first = await new Promise<TranscriptionEntry | null>((resolve) => {
+        const timer = setTimeout(() => {
+          waiter = null;
+          log.debug('waitForNext: timed out');
+          resolve(null);
+        }, timeoutMs);
+
+        waiter = (entry: TranscriptionEntry | null) => {
+          clearTimeout(timer);
+          resolve(entry);
+        };
+      });
     }
 
-    log.debug('waitForNext: waiting for next entry', { timeoutMs });
+    if (first === null) return null;
 
-    return new Promise<TranscriptionEntry | null>((resolve) => {
-      const timer = setTimeout(() => {
-        waiter = null;
-        log.debug('waitForNext: timed out');
-        resolve(null);
-      }, timeoutMs);
+    // If it's a trigger phrase, return immediately (no accumulation)
+    if (first.text === '__jarvis_pause__' || first.text === '__jarvis_resume__') {
+      return first;
+    }
 
-      waiter = (entry: TranscriptionEntry | null) => {
-        clearTimeout(timer);
-        resolve(entry);
-      };
+    // Accumulate: wait for a silence gap before returning
+    const accumulated: TranscriptionEntry[] = [first];
+
+    const collectMore = (): Promise<void> =>
+      new Promise<void>((resolve) => {
+        const gapTimer = setTimeout(() => {
+          waiter = null;
+          resolve(); // Silence gap reached — done accumulating
+        }, silenceGapMs);
+
+        waiter = (entry: TranscriptionEntry | null) => {
+          clearTimeout(gapTimer);
+          if (entry !== null) {
+            // Trigger phrases break accumulation immediately
+            if (entry.text === '__jarvis_pause__' || entry.text === '__jarvis_resume__') {
+              entries.unshift(entry); // Put it back for next call
+              resolve();
+              return;
+            }
+            accumulated.push(entry);
+            // Wait for more
+            collectMore().then(resolve);
+          } else {
+            resolve();
+          }
+        };
+      });
+
+    await collectMore();
+
+    // Merge accumulated entries
+    const merged: TranscriptionEntry = {
+      text: accumulated.map(e => e.text).join(' '),
+      confidence: accumulated.reduce((s, e) => s + e.confidence, 0) / accumulated.length,
+      timestamp: accumulated[0].timestamp,
+      durationMs: accumulated.reduce((s, e) => s + e.durationMs, 0),
+      lowQuality: accumulated.some(e => e.lowQuality),
+    };
+
+    log.debug('waitForNext: returning accumulated', {
+      text: merged.text,
+      segments: accumulated.length,
+      depth: entries.length,
     });
+
+    return merged;
   }
 
   function depth(): number {
