@@ -350,7 +350,7 @@ export function createOrchestrator(options: { dataDir: string }): Orchestrator {
             'synth', '0.2', 'sine', '1400',
             'fade', 't', '0', '0.2', '0.15',
             'tremolo', '20',
-            'vol', '0.15',
+            'vol', '0.3',
           ], { stdio: 'ignore', timeout: 2000 });
         } catch {
           // Chime is non-critical — don't block on failure
@@ -370,7 +370,7 @@ export function createOrchestrator(options: { dataDir: string }): Orchestrator {
           'synth', '0.12', 'sine', '1000',
           'fade', 't', '0', '0.12', '0.08',
           'tremolo', '15',
-          'vol', '0.2',
+          'vol', '0.4',
         ], { stdio: 'ignore', timeout: 2000 });
       } catch {
         // Non-critical
