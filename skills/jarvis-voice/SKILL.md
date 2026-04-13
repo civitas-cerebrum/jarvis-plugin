@@ -49,6 +49,9 @@ this loop** — always return to step 1 after completing work.
 
 1. Call `ListenForResponse` to get the user's voice input. A listening indicator
    tone plays automatically so the user knows you're ready.
+   - **Expecting a response** (just asked a question): use `timeout_ms: 30000`
+   - **Not expecting a response** (just made a statement, or working): use
+     `timeout_ms: 5000` — short poll so you stay responsive
 2. **Interpret the raw transcription.** It comes from local speech-to-text and
    WILL contain errors — missing punctuation, misheard words, garbled phrases.
    Use your full conversation context to figure out what the user actually meant.
@@ -58,6 +61,18 @@ this loop** — always return to step 1 after completing work.
 4. Call `SpeakText` with a spoken summary. Also write the text response to the
    terminal so the user can read it while audio plays.
 5. **Return to step 1 immediately.** Do not wait, do not stop the loop.
+
+### Non-Blocking Work Pattern
+
+The plugin queues speech continuously in the background, even while you're busy
+doing work (editing files, running commands, speaking). You don't lose messages.
+
+When doing multi-step work:
+- Do a chunk of work (edit a file, run a command)
+- Quick poll `ListenForResponse(timeout_ms: 5000)` to check for interrupts
+- If the user said something, handle it before continuing
+- If timeout, continue with the next step
+- Speak results when ready, then poll again
 
 ## Hands-Free Experience
 
