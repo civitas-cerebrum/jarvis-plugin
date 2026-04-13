@@ -94,6 +94,38 @@ src/
 | `GetDebugLog` | Ring buffer log entries |
 | `GetSessionStats` | Utterance counts, verification rates, latency stats |
 
+## Installation
+
+### Prerequisites
+
+- **macOS** (CoreAudio required for mic capture)
+- **Node.js 18+**
+- **SoX** — audio capture and playback
+  ```bash
+  brew install sox
+  ```
+
+### Install as Claude Code Plugin
+
+```bash
+# Add the Jarvis marketplace
+/plugin marketplace add civitas-cerebrum/jarvis-plugin
+
+# Install the plugin
+/plugin install jarvis-voice@jarvis-marketplace
+```
+
+Dependencies install automatically on first session start. Voice models (~300MB) download on first use.
+
+### Activate
+
+Start a Claude Code session and say:
+```
+/jarvis-voice:jarvis-voice
+```
+
+On first run, Jarvis will guide you through voice enrollment (~30 seconds) to learn your voice for speaker verification.
+
 ## Development
 
 ```bash

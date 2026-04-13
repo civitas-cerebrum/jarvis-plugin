@@ -1,10 +1,39 @@
 {
   "name": "jarvis-voice",
   "version": "0.1.0",
-  "description": "Voice-driven interaction for Claude Code — local STT, TTS, and speaker verification via sherpa-onnx",
+  "description": "Voice-driven interaction for Claude Code — local STT, TTS, and speaker verification. Requires SoX (brew install sox).",
   "author": {
     "name": "Ay"
   },
   "license": "MIT",
-  "keywords": ["voice", "speech", "jarvis", "stt", "tts"]
+  "keywords": ["voice", "speech", "jarvis", "stt", "tts", "sherpa-onnx"],
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "which sox >/dev/null 2>&1 || { echo '❌ SoX not found. Install with: brew install sox'; exit 1; }"
+          },
+          {
+            "type": "command",
+            "command": "diff -q \"${CLAUDE_PLUGIN_ROOT}/package.json\" \"${CLAUDE_PLUGIN_DATA}/package.json\" >/dev/null 2>&1 || (cp \"${CLAUDE_PLUGIN_ROOT}/package.json\" \"${CLAUDE_PLUGIN_DATA}/\" && cd \"${CLAUDE_PLUGIN_DATA}\" && npm install) || rm -f \"${CLAUDE_PLUGIN_DATA}/package.json\""
+          },
+          {
+            "type": "command",
+            "command": "test -f \"${CLAUDE_PLUGIN_ROOT}/dist/main.js\" || (cd \"${CLAUDE_PLUGIN_ROOT}\" && npx tsc)"
+          }
+        ]
+      }
+    ]
+  },
+  "mcpServers": {
+    "jarvis-voice": {
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/dist/main.js"],
+      "env": {
+        "NODE_PATH": "${CLAUDE_PLUGIN_DATA}/node_modules"
+      }
+    }
+  }
 }
