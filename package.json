@@ -1,0 +1,25 @@
+{
+  "name": "@civitas-cerebrum/jarvis-voice",
+  "version": "0.1.0",
+  "description": "Voice-driven interaction for Claude Code — local STT, TTS, and speaker verification",
+  "type": "module",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "sherpa-onnx": "^1.12.37"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.17",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.1"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

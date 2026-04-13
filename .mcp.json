@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "jarvis-voice": {
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/dist/main.js"],
+      "env": {
+        "JARVIS_DATA": "${CLAUDE_PLUGIN_DATA}",
+        "JARVIS_ROOT": "${CLAUDE_PLUGIN_ROOT}"
+      }
+    }
+  }
+}

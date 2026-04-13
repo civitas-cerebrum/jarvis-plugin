@@ -1,0 +1,15 @@
+{
+  "name": "jarvis-marketplace",
+  "owner": {
+    "name": "Ay"
+  },
+  "plugins": [
+    {
+      "id": "jarvis-voice",
+      "name": "jarvis-voice",
+      "source": "./",
+      "version": "0.1.0",
+      "description": "Voice-driven interaction for Claude Code — local STT, TTS, and speaker verification"
+    }
+  ]
+}

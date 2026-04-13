@@ -1,0 +1,10 @@
+{
+  "name": "jarvis-voice",
+  "version": "0.1.0",
+  "description": "Voice-driven interaction for Claude Code — local STT, TTS, and speaker verification via sherpa-onnx",
+  "author": {
+    "name": "Ay"
+  },
+  "license": "MIT",
+  "keywords": ["voice", "speech", "jarvis", "stt", "tts"]
+}
