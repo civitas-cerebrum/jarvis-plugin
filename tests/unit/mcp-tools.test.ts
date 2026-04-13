@@ -82,7 +82,7 @@ describe('createToolHandlers', () => {
     const handlers = createToolHandlers(ctx);
     const result = await handlers.SpeakText({ text: 'Hello world' });
     expect(result).toEqual({ spoken: true });
-    expect(ctx.speakText).toHaveBeenCalledWith('Hello world');
+    expect(ctx.speakText).toHaveBeenCalledWith('Hello world', false);
   });
 
   it('SpeakText handler throws when text is missing', async () => {

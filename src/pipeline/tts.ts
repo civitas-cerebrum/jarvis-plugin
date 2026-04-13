@@ -9,6 +9,10 @@ export interface TtsOptions {
   numThreads?: number;
   speakerId?: number;
   speed?: number;
+  /** Use Kokoro engine instead of Piper VITS */
+  kokoro?: boolean;
+  /** espeak-ng-data directory (used by Kokoro) */
+  dataDir?: string;
 }
 
 export interface TtsResult {
@@ -37,15 +41,20 @@ export function createTtsEngine(options: TtsOptions): TtsEngine {
 
   const initStart = performance.now();
 
+  const modelConfig = options.kokoro
+    ? {
+        kokoro: {
+          model: options.modelPath,
+          voices: options.voicesPath,
+          tokens: options.tokensPath,
+          ...(options.dataDir ? { dataDir: options.dataDir } : {}),
+        },
+      }
+    : { vits: { model: options.modelPath, tokens: options.tokensPath, dataDir: options.voicesPath } };
+
   const tts = new sherpa.OfflineTts({
-    model: {
-      vits: {
-        model: options.modelPath,
-        tokens: options.tokensPath,
-        dataDir: options.voicesPath,
-      },
-    },
-    numThreads: options.numThreads ?? 1,
+    model: modelConfig,
+    numThreads: options.numThreads ?? 2,
   });
 
   const initMs = (performance.now() - initStart).toFixed(1);

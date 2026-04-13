@@ -51,6 +51,16 @@ declare module 'sherpa-onnx-node' {
     verify(options: { name: string; v: Float32Array; threshold: number }): boolean;
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  class OfflineSpeechDenoiser {
+    constructor(config: any);
+    readonly sampleRate: number;
+    run(input: { samples: Float32Array; sampleRate: number }): {
+      samples: Float32Array;
+      sampleRate: number;
+    };
+  }
+
   function readWave(path: string): { samples: Float32Array; sampleRate: number };
 
   const _default: {
@@ -59,6 +69,7 @@ declare module 'sherpa-onnx-node' {
     OfflineTts: typeof OfflineTts;
     SpeakerEmbeddingExtractor: typeof SpeakerEmbeddingExtractor;
     SpeakerEmbeddingManager: typeof SpeakerEmbeddingManager;
+    OfflineSpeechDenoiser: typeof OfflineSpeechDenoiser;
     readWave: typeof readWave;
   };
 

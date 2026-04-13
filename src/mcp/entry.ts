@@ -18,7 +18,17 @@ interface JsonRpcResponse {
 }
 
 function send(msg: JsonRpcResponse): void {
-  process.stdout.write(JSON.stringify(msg) + '\n');
+  const json = JSON.stringify(msg) + '\n';
+  try {
+    const ok = process.stdout.write(json);
+    if (!ok) {
+      process.stderr.write(`[jarvis] stdout backpressure on id=${msg.id}\n`);
+    }
+  } catch (err: unknown) {
+    process.stderr.write(
+      `[jarvis] stdout.write threw: ${err instanceof Error ? err.message : String(err)}\n`,
+    );
+  }
 }
 
 export function initMcpServer(ctx: ToolContext): void {
@@ -27,7 +37,26 @@ export function initMcpServer(ctx: ToolContext): void {
   const rl = createInterface({ input: process.stdin, terminal: false });
 
   rl.on('line', (line: string) => {
-    void handleLine(line, handlers);
+    handleLine(line, handlers).catch((err: unknown) => {
+      process.stderr.write(
+        `[jarvis] Unhandled error in handleLine: ${err instanceof Error ? err.message : String(err)}\n`,
+      );
+    });
+  });
+
+  rl.on('close', () => {
+    process.stderr.write('[jarvis] stdin closed, shutting down\n');
+    process.exit(0);
+  });
+
+  rl.on('error', (err: Error) => {
+    process.stderr.write(`[jarvis] readline error: ${err.message}\n`);
+    process.exit(1);
+  });
+
+  process.stdout.on('error', (err: Error) => {
+    process.stderr.write(`[jarvis] stdout error: ${err.message}\n`);
+    process.exit(1);
   });
 }
 

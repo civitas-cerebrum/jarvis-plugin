@@ -14,6 +14,7 @@ function makeLogger() {
 describe('TranscriptionQueue', () => {
   it('pushes and pops in FIFO order', () => {
     const queue = createTranscriptionQueue({ maxDepth: 10, logger: makeLogger() });
+    queue.setMode('active');
 
     queue.push(makeEntry('first'));
     queue.push(makeEntry('second'));
@@ -32,6 +33,7 @@ describe('TranscriptionQueue', () => {
 
   it('drops oldest when max depth exceeded', () => {
     const queue = createTranscriptionQueue({ maxDepth: 2, logger: makeLogger() });
+    queue.setMode('active');
 
     queue.push(makeEntry('a'));
     queue.push(makeEntry('b'));
@@ -44,6 +46,7 @@ describe('TranscriptionQueue', () => {
 
   it('waitForNext resolves when entry is pushed', async () => {
     const queue = createTranscriptionQueue({ maxDepth: 10, logger: makeLogger() });
+    queue.setMode('active');
 
     setTimeout(() => {
       queue.push(makeEntry('delayed'));
@@ -63,6 +66,7 @@ describe('TranscriptionQueue', () => {
 
   it('pops existing entry immediately from waitForNext', async () => {
     const queue = createTranscriptionQueue({ maxDepth: 10, logger: makeLogger() });
+    queue.setMode('active');
 
     queue.push(makeEntry('already-there'));
 

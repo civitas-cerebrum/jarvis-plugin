@@ -1,7 +1,7 @@
 export interface ToolContext {
   getStatus(): Record<string, unknown>;
   listenForResponse(timeoutMs: number): Promise<Record<string, unknown>>;
-  speakText(text: string): Promise<Record<string, unknown>>;
+  speakText(text: string, expectResponse?: boolean): Promise<Record<string, unknown>>;
   startEnrollment(sessionId?: string): Promise<Record<string, unknown>>;
   testEnrollment(sessionId: string): Promise<Record<string, unknown>>;
   saveProfile(sessionId: string): Promise<Record<string, unknown>>;
@@ -40,13 +40,17 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   },
   {
     name: 'SpeakText',
-    description: 'Synthesize and play text-to-speech audio through the speaker.',
+    description: 'Synthesize and play text-to-speech audio through the speaker. Use expect_response when asking the user a question so the next ListenForResponse accepts any speech without requiring the wake word.',
     inputSchema: {
       type: 'object',
       properties: {
         text: {
           type: 'string',
           description: 'The text to speak aloud.',
+        },
+        expect_response: {
+          type: 'boolean',
+          description: 'Set to true when asking the user a question. Switches to active listening mode so the user can respond without saying the wake word.',
         },
       },
       required: ['text'],
@@ -203,7 +207,8 @@ export function createToolHandlers(ctx: ToolContext): ToolHandlers {
       if (typeof params.text !== 'string') {
         throw new Error('Missing required parameter: text');
       }
-      return ctx.speakText(params.text);
+      const expectResponse = params.expect_response === true;
+      return ctx.speakText(params.text, expectResponse);
     },
 
     async GetVoiceStatus() {

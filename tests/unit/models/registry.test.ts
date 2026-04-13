@@ -50,7 +50,8 @@ describe("getModelEntry", () => {
 describe("getMissingModels", () => {
   it("reports all models when directory does not exist", () => {
     const missing = getMissingModels("/nonexistent/path");
-    expect(missing).toHaveLength(MODEL_REGISTRY.length);
+    const requiredModels = MODEL_REGISTRY.filter((m) => !m.optional);
+    expect(missing).toHaveLength(requiredModels.length);
     const names = missing.map((m) => m.name);
     for (const required of REQUIRED_MODELS) {
       expect(names).toContain(required);

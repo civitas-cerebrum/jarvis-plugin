@@ -49,9 +49,13 @@ export function createAudioCapture(options: CaptureOptions): AudioCapture {
   }
 
   function spawnRec(): void {
+    // Output raw 16-bit PCM, let rec capture at native rate, then
+    // downsample with the 'rate' effect. Passing -r directly fails on
+    // macOS when the hardware doesn't support the requested rate.
     const args = [
       '-q', '-t', 'raw', '-b', '16', '-e', 'signed-integer',
-      '-c', '1', '-r', String(sampleRate), '-',
+      '-c', '1', '-',
+      'rate', String(sampleRate),
     ];
 
     log.info('spawning rec process', { sampleRate });

@@ -8,27 +8,71 @@ export interface TranscriptionEntry {
   lowQuality: boolean;
 }
 
+export type ListeningMode = 'wake-word' | 'active';
+
 export interface TranscriptionQueue {
   push(entry: TranscriptionEntry): void;
   pop(): TranscriptionEntry | null;
   waitForNext(timeoutMs: number): Promise<TranscriptionEntry | null>;
   depth(): number;
   clear(): void;
+  setMode(mode: ListeningMode): void;
+  getMode(): ListeningMode;
 }
 
 export interface CreateTranscriptionQueueOptions {
   maxDepth: number;
   logger: Logger;
+  wakeWord?: string;
 }
 
 export function createTranscriptionQueue(options: CreateTranscriptionQueueOptions): TranscriptionQueue {
   const { maxDepth } = options;
+  const wakeWord = (options.wakeWord ?? 'jarvis').toLowerCase();
   const log: ScopedLogger = options.logger.scope('pipeline:queue');
   const entries: TranscriptionEntry[] = [];
 
   let waiter: ((entry: TranscriptionEntry | null) => void) | null = null;
+  let mode: ListeningMode = 'active';
+
+  /** Check if text starts with the wake word, return stripped text or null */
+  function matchWakeWord(text: string): string | null {
+    const lower = text.toLowerCase().trim();
+    // Match "jarvis", "hey jarvis", "yo jarvis", etc.
+    const patterns = [
+      new RegExp(`^(?:hey\\s+|yo\\s+|ok\\s+)?${wakeWord}[,.:!?\\s]*(.*)`, 'i'),
+    ];
+    for (const pattern of patterns) {
+      const match = lower.match(pattern);
+      if (match) {
+        return match[1]?.trim() || null; // null if just the wake word with no command
+      }
+    }
+    return null;
+  }
 
   function push(entry: TranscriptionEntry): void {
+    // In wake-word mode, filter entries that don't contain the wake word
+    if (mode === 'wake-word') {
+      const stripped = matchWakeWord(entry.text);
+      if (stripped === null && !matchWakeWord(entry.text)?.length) {
+        // Check if it's JUST the wake word (no command yet) — still pass it
+        // so Claude knows the user is addressing Jarvis
+        const justWakeWord = entry.text.toLowerCase().trim().replace(/[,.:!?]/g, '');
+        const isJustWakeWord = justWakeWord === wakeWord ||
+          justWakeWord === `hey ${wakeWord}` ||
+          justWakeWord === `yo ${wakeWord}`;
+        if (!isJustWakeWord) {
+          log.debug('push: filtered (no wake word)', { text: entry.text, mode });
+          return;
+        }
+      }
+      // Strip the wake word prefix from the text
+      if (stripped !== null) {
+        entry = { ...entry, text: stripped };
+      }
+    }
+
     if (waiter !== null) {
       log.debug('push: delivering directly to waiter', { text: entry.text });
       const resolve = waiter;
@@ -38,7 +82,7 @@ export function createTranscriptionQueue(options: CreateTranscriptionQueueOption
     }
 
     entries.push(entry);
-    log.debug('push: queued entry', { text: entry.text, depth: entries.length });
+    log.debug('push: queued entry', { text: entry.text, depth: entries.length, mode });
 
     if (entries.length > maxDepth) {
       const dropped = entries.shift()!;
@@ -88,5 +132,16 @@ export function createTranscriptionQueue(options: CreateTranscriptionQueueOption
     log.debug('clear', { cleared: count });
   }
 
-  return { push, pop, waitForNext, depth, clear };
+  function setMode(newMode: ListeningMode): void {
+    if (newMode !== mode) {
+      log.info('listening mode changed', { from: mode, to: newMode });
+      mode = newMode;
+    }
+  }
+
+  function getMode(): ListeningMode {
+    return mode;
+  }
+
+  return { push, pop, waitForNext, depth, clear, setMode, getMode };
 }

@@ -1,3 +1,5 @@
+import { existsSync } from 'node:fs';
+import sherpa from 'sherpa-onnx-node';
 import { createLogger, LogLevel } from '../logging/logger.js';
 import type { Logger, ScopedLogger } from '../logging/logger.js';
 import { loadConfig, saveConfig } from '../config.js';
@@ -76,7 +78,10 @@ export function createOrchestrator(options: { dataDir: string }): Orchestrator {
   let embeddingExtractor: EmbeddingExtractor | null = null;
   let passiveRefiner: PassiveRefiner | null = null;
   let enrollmentSession: EnrollmentSession | null = null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let denoiser: any = null;
   let pipelineReady = false;
+  let isSpeaking = false;
 
   const stats: SessionStats = {
     utterancesCaptured: 0,
@@ -89,42 +94,63 @@ export function createOrchestrator(options: { dataDir: string }): Orchestrator {
     consecutiveRejections: 0,
   };
 
-  function handleSpeechSegment(samples: Float32Array): void {
+  function handleSpeechSegment(rawSamples: Float32Array): void {
+    // Skip processing while TTS is playing to keep the event loop free
+    // for streaming audio data to the play process
+    if (isSpeaking) return;
+
+    // Denoise if available
+    const samples = denoiser
+      ? denoiser.run({ samples: rawSamples, sampleRate: 16000 }).samples
+      : rawSamples;
+
     stats.utterancesCaptured++;
 
     if (embeddingExtractor) {
       const sampleEmbedding = embeddingExtractor.extract(samples, 16000);
 
-      const verification = isVerifiedSpeaker(
-        voiceProfile,
-        sampleEmbedding,
-        config.speakerConfidenceThreshold,
-      );
-
-      if (!verification.verified) {
-        stats.utterancesRejected++;
-        stats.consecutiveRejections++;
-        log.debug('Speaker rejected', {
-          confidence: verification.confidence,
-          consecutive: stats.consecutiveRejections,
+      // During enrollment, feed embeddings into the session instead of verifying
+      if (enrollmentSession && enrollmentSession.status() === 'recording') {
+        enrollmentSession.addEmbedding(sampleEmbedding);
+        log.info('Enrollment: captured embedding', {
+          remaining: enrollmentSession.phrasesRemaining(),
         });
-        if (
-          stats.consecutiveRejections >=
-          config.consecutiveRejectionsBeforeWarning
-        ) {
-          log.warn('Many consecutive speaker rejections', {
-            count: stats.consecutiveRejections,
+        // Still transcribe so the queue has text, but skip verification
+        stats.utterancesVerified++;
+        stats.consecutiveRejections = 0;
+        stats.confidenceSum += 1.0;
+      } else {
+        const verification = isVerifiedSpeaker(
+          voiceProfile,
+          sampleEmbedding,
+          config.speakerConfidenceThreshold,
+        );
+
+        if (!verification.verified) {
+          stats.utterancesRejected++;
+          stats.consecutiveRejections++;
+          log.debug('Speaker rejected', {
+            confidence: verification.confidence,
+            consecutive: stats.consecutiveRejections,
           });
+          if (
+            stats.consecutiveRejections >=
+            config.consecutiveRejectionsBeforeWarning
+          ) {
+            log.warn('Many consecutive speaker rejections', {
+              count: stats.consecutiveRejections,
+            });
+          }
+          return;
         }
-        return;
-      }
 
-      stats.utterancesVerified++;
-      stats.consecutiveRejections = 0;
-      stats.confidenceSum += verification.confidence;
+        stats.utterancesVerified++;
+        stats.consecutiveRejections = 0;
+        stats.confidenceSum += verification.confidence;
 
-      if (passiveRefiner && voiceProfile) {
-        passiveRefiner.maybeRefine(sampleEmbedding, verification.confidence);
+        if (passiveRefiner && voiceProfile) {
+          passiveRefiner.maybeRefine(sampleEmbedding, verification.confidence);
+        }
       }
     } else {
       // No embedding extractor — count as verified with full confidence
@@ -165,8 +191,20 @@ export function createOrchestrator(options: { dataDir: string }): Orchestrator {
       modelPath: vadModelPath,
       threshold: config.vadSensitivity,
       logger: logger.scope('pipeline:vad'),
-      onSpeechSegment: handleSpeechSegment,
+      onSpeechSegment(samples: Float32Array) {
+        // Defer to next tick so the event loop stays responsive for MCP I/O
+        setImmediate(() => handleSpeechSegment(samples));
+      },
     });
+
+    // Optional speech denoiser — cleans audio before STT/embedding
+    const denoiserModel = join(getModelPath(dataDir, 'denoiser'), 'gtcrn_simple.onnx');
+    if (existsSync(denoiserModel)) {
+      denoiser = new sherpa.OfflineSpeechDenoiser({
+        model: { gtcrn: { model: denoiserModel }, numThreads: 1 },
+      });
+      log.info('Speech denoiser loaded (GTCRN)');
+    }
 
     const sttModelDir = getModelPath(dataDir, 'whisper-small');
     stt = createSttEngine({
@@ -187,13 +225,35 @@ export function createOrchestrator(options: { dataDir: string }): Orchestrator {
       logger,
     });
 
-    const ttsModelDir = getModelPath(dataDir, 'tts-kokoro');
-    tts = createTtsEngine({
-      modelPath: join(ttsModelDir, 'en_US-amy-low.onnx'),
-      voicesPath: join(ttsModelDir, 'espeak-ng-data'),
-      tokensPath: join(ttsModelDir, 'tokens.txt'),
-      logger,
-    });
+    // Prefer Kokoro TTS (24kHz, much higher quality) over Piper VITS
+    const kokoroDir = getModelPath(dataDir, 'tts-kokoro-v1');
+    const kokoroModel = join(kokoroDir, 'kokoro-v0.19.onnx');
+    const kokoroVoices = join(kokoroDir, 'voices-v0.19.bin');
+
+    const kokoroTokens = join(kokoroDir, 'tokens.txt');
+    // espeak-ng-data shared with Piper
+    const espeakDataDir = join(getModelPath(dataDir, 'tts-kokoro'), 'espeak-ng-data');
+
+    if (existsSync(kokoroModel) && existsSync(kokoroVoices) && existsSync(kokoroTokens)) {
+      log.info('Using Kokoro TTS engine (24kHz)');
+      tts = createTtsEngine({
+        modelPath: kokoroModel,
+        voicesPath: kokoroVoices,
+        tokensPath: kokoroTokens,
+        dataDir: existsSync(espeakDataDir) ? espeakDataDir : undefined,
+        kokoro: true,
+        logger,
+      });
+    } else {
+      log.info('Kokoro not found, falling back to Piper VITS');
+      const ttsModelDir = getModelPath(dataDir, 'tts-kokoro');
+      tts = createTtsEngine({
+        modelPath: join(ttsModelDir, 'en_US-amy-low.onnx'),
+        voicesPath: join(ttsModelDir, 'espeak-ng-data'),
+        tokensPath: join(ttsModelDir, 'tokens.txt'),
+        logger,
+      });
+    }
 
     playback = createAudioPlayback({
       logger,
@@ -239,7 +299,14 @@ export function createOrchestrator(options: { dataDir: string }): Orchestrator {
         return;
       }
 
-      initPipeline();
+      try {
+        initPipeline();
+      } catch (err: unknown) {
+        log.error('Pipeline initialization failed', {
+          error: err instanceof Error ? err.message : String(err),
+        });
+        // MCP server stays up — tools like downloadModels/getStatus still work
+      }
     },
 
     destroy(): void {
@@ -269,13 +336,14 @@ export function createOrchestrator(options: { dataDir: string }): Orchestrator {
         profileLoaded: voiceProfile !== null,
         queueDepth: queue.depth(),
         consecutiveRejections: stats.consecutiveRejections,
+        listeningMode: queue.getMode(),
       };
     },
 
     async listenForResponse(timeoutMs: number): Promise<Record<string, unknown>> {
       const entry = await queue.waitForNext(timeoutMs);
       if (entry === null) {
-        return { heard: false, reason: 'timeout' };
+        return { heard: false, reason: 'timeout', listeningMode: queue.getMode() };
       }
       return {
         heard: true,
@@ -283,22 +351,41 @@ export function createOrchestrator(options: { dataDir: string }): Orchestrator {
         confidence: entry.confidence,
         durationMs: entry.durationMs,
         lowQuality: entry.lowQuality,
+        listeningMode: queue.getMode(),
       };
     },
 
-    async speakText(text: string): Promise<Record<string, unknown>> {
+    async speakText(text: string, expectResponse?: boolean): Promise<Record<string, unknown>> {
       if (!tts || !playback) {
         return { spoken: false, reason: 'TTS or playback not initialized' };
       }
 
+      // Suppress speech processing and pause capture during playback so
+      // the pipeline doesn't block the event loop and starve the play
+      // process of data (causing EPIPE / truncated audio).
+      isSpeaking = true;
+      capture?.stop();
+
       const result = tts.synthesize(text);
       stats.ttsCount++;
       const playResult = await playback.play(result.samples, result.sampleRate);
+
+      // Resume capture after playback completes
+      capture?.start();
+      isSpeaking = false;
+
+      // If Claude expects a response, switch to active mode so the next
+      // ListenForResponse returns any verified speech (no wake word needed)
+      if (expectResponse) {
+        queue.setMode('active');
+      }
+
       return {
         spoken: true,
         interrupted: playResult.interrupted,
         sampleRate: result.sampleRate,
         samples: result.samples.length,
+        listeningMode: queue.getMode(),
       };
     },
 

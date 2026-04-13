@@ -8,6 +8,7 @@ export interface ModelEntry {
   extractDir: string;
   sizeMb: number;
   files: string[]; // key files to verify presence
+  optional?: boolean; // optional models don't block pipeline startup
 }
 
 export const MODEL_REGISTRY: ModelEntry[] = [
@@ -35,6 +36,61 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     sizeMb: 60,
     files: ["en_US-amy-low.onnx", "tokens.txt"],
   },
+  // Additional TTS voices for audition
+  {
+    name: "tts-alan",
+    description: "Alan - British Male (low)",
+    url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-en_GB-alan-low.tar.bz2",
+    extractDir: "tts-alan",
+    sizeMb: 60,
+    files: ["en_GB-alan-low.onnx", "tokens.txt"],
+    optional: true,
+  },
+  {
+    name: "tts-alan-medium",
+    description: "Alan - British Male (medium)",
+    url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-en_GB-alan-medium.tar.bz2",
+    extractDir: "tts-alan-medium",
+    sizeMb: 80,
+    files: ["en_GB-alan-medium.onnx", "tokens.txt"],
+    optional: true,
+  },
+  {
+    name: "tts-northern-english-male",
+    description: "Northern English Male - British (medium)",
+    url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-en_GB-northern_english_male-medium.tar.bz2",
+    extractDir: "tts-northern-english-male",
+    sizeMb: 80,
+    files: ["en_GB-northern_english_male-medium.onnx", "tokens.txt"],
+    optional: true,
+  },
+  {
+    name: "tts-danny",
+    description: "Danny - American Male (low)",
+    url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-en_US-danny-low.tar.bz2",
+    extractDir: "tts-danny",
+    sizeMb: 60,
+    files: ["en_US-danny-low.onnx", "tokens.txt"],
+    optional: true,
+  },
+  {
+    name: "tts-ryan-medium",
+    description: "Ryan - American Male (medium)",
+    url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-en_US-ryan-medium.tar.bz2",
+    extractDir: "tts-ryan-medium",
+    sizeMb: 80,
+    files: ["en_US-ryan-medium.onnx", "tokens.txt"],
+    optional: true,
+  },
+  {
+    name: "tts-joe",
+    description: "Joe - American Male (medium)",
+    url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-en_US-joe-medium.tar.bz2",
+    extractDir: "tts-joe",
+    sizeMb: 80,
+    files: ["en_US-joe-medium.onnx", "tokens.txt"],
+    optional: true,
+  },
   {
     name: "speaker-id",
     description: "WeSpeaker ResNet34",
@@ -59,5 +115,9 @@ export function isModelPresent(dataDir: string, model: ModelEntry): boolean {
 }
 
 export function getMissingModels(dataDir: string): ModelEntry[] {
-  return MODEL_REGISTRY.filter((model) => !isModelPresent(dataDir, model));
+  return MODEL_REGISTRY.filter((model) => !model.optional && !isModelPresent(dataDir, model));
+}
+
+export function getOptionalModels(): ModelEntry[] {
+  return MODEL_REGISTRY.filter((model) => model.optional === true);
 }

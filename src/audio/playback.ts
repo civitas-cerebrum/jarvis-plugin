@@ -1,4 +1,7 @@
 import { spawn, type ChildProcess } from 'node:child_process';
+import { writeFileSync, unlinkSync, mkdtempSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import type { Logger, ScopedLogger } from '../logging/logger.js';
 
 export interface PlaybackOptions {
@@ -33,12 +36,14 @@ function float32ToInt16Buffer(samples: Float32Array): Buffer {
 
 export function createAudioPlayback(options: PlaybackOptions): AudioPlayback {
   const log: ScopedLogger = options.logger.scope('audio:playback');
+  const tempDir = mkdtempSync(join(tmpdir(), 'jarvis-'));
+  const tempFile = join(tempDir, 'tts.raw');
   let playing = false;
   let destroyed = false;
   let proc: ChildProcess | null = null;
   let currentResolve: ((result: PlaybackResult) => void) | undefined;
 
-  log.info('playback created');
+  log.info('playback created', { tempDir });
 
   return {
     play(samples: Float32Array, sampleRate: number): Promise<PlaybackResult> {
@@ -57,15 +62,20 @@ export function createAudioPlayback(options: PlaybackOptions): AudioPlayback {
 
       const pcmBuffer = float32ToInt16Buffer(samples);
 
+      // Write PCM to a temp file — SoX play doesn't handle Node.js
+      // socketpair-based stdin pipes correctly (exits after partial read).
+      // Using a file lets play read at its own pace.
+      writeFileSync(tempFile, pcmBuffer);
+
       return new Promise<PlaybackResult>((resolve) => {
         currentResolve = resolve;
 
         const args = [
           '-q', '-t', 'raw', '-b', '16', '-e', 'signed-integer',
-          '-c', '1', '-r', String(sampleRate), '-',
+          '-c', '1', '-r', String(sampleRate), tempFile,
         ];
 
-        proc = spawn('play', args, { stdio: ['pipe', 'ignore', 'pipe'] });
+        proc = spawn('play', args, { stdio: ['ignore', 'ignore', 'pipe'] });
 
         proc.stderr?.on('data', (chunk: Buffer) => {
           const msg = chunk.toString().trim();
@@ -83,22 +93,16 @@ export function createAudioPlayback(options: PlaybackOptions): AudioPlayback {
           if (r) r({ interrupted: false });
         });
 
-        proc.on('close', (_code: number | null) => {
-          // If currentResolve is still set, the process exited naturally
+        proc.on('close', (code: number | null, signal: string | null) => {
           const r = currentResolve;
           if (r) {
             playing = false;
             proc = null;
             currentResolve = undefined;
-            log.info('playback complete');
+            log.info('playback complete', { code, signal });
             options.onPlaybackComplete?.();
             r({ interrupted: false });
           }
-        });
-
-        // Write PCM data to stdin and close it so play knows input is done
-        proc.stdin?.write(pcmBuffer, () => {
-          proc?.stdin?.end();
         });
       });
     },
@@ -152,6 +156,7 @@ export function createAudioPlayback(options: PlaybackOptions): AudioPlayback {
         log.info('playback stopped during destroy');
       }
       destroyed = true;
+      try { unlinkSync(tempFile); } catch { /* ignore */ }
       log.info('playback destroyed');
     },
   };

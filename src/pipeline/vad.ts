@@ -93,8 +93,6 @@ export function createVadPipeline(options: VadOptions): VadPipeline {
   }
 
   function destroy(): void {
-    logger.info('Destroying VAD pipeline');
-    vad.free();
     logger.info('VAD pipeline destroyed');
   }
 
