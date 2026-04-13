@@ -45,7 +45,7 @@ describe('TranscriptionQueue', () => {
   });
 
   it('waitForNext resolves when entry is pushed', async () => {
-    const queue = createTranscriptionQueue({ maxDepth: 10, logger: makeLogger() });
+    const queue = createTranscriptionQueue({ maxDepth: 10, logger: makeLogger(), silenceGapMs: 100 });
     queue.setMode('active');
 
     setTimeout(() => {
@@ -89,7 +89,7 @@ describe('TranscriptionQueue', () => {
   });
 
   it('pops existing entry immediately from waitForNext', async () => {
-    const queue = createTranscriptionQueue({ maxDepth: 10, logger: makeLogger() });
+    const queue = createTranscriptionQueue({ maxDepth: 10, logger: makeLogger(), silenceGapMs: 100 });
     queue.setMode('active');
 
     queue.push(makeEntry('already-there'));

@@ -159,6 +159,10 @@ export function createOrchestrator(options: { dataDir: string }): Orchestrator {
       stats.confidenceSum += 1.0;
     }
 
+    // Signal speech activity immediately so the accumulation gap timer resets
+    // before waiting for STT — prevents cutoff during transcription latency
+    queue.notifySpeechActivity();
+
     if (stt) {
       void stt
         .transcribeSegment(samples, 16000)

@@ -14,6 +14,8 @@ export interface TranscriptionQueue {
   push(entry: TranscriptionEntry): void;
   pop(): TranscriptionEntry | null;
   waitForNext(timeoutMs: number): Promise<TranscriptionEntry | null>;
+  /** Signal that verified speech was detected — resets the silence gap timer */
+  notifySpeechActivity(): void;
   depth(): number;
   clear(): void;
   setMode(mode: ListeningMode): void;
@@ -25,14 +27,14 @@ export interface CreateTranscriptionQueueOptions {
   maxDepth: number;
   logger: Logger;
   wakeWord?: string;
-  /** Silence gap (ms) before returning accumulated speech. Default: 3000 */
+  /** Silence gap (ms) before returning accumulated speech. Default: 5000 */
   silenceGapMs?: number;
 }
 
 export function createTranscriptionQueue(options: CreateTranscriptionQueueOptions): TranscriptionQueue {
   const { maxDepth } = options;
   const wakeWord = (options.wakeWord ?? 'jarvis').toLowerCase();
-  const silenceGapMs = options.silenceGapMs ?? 3500;
+  const silenceGapMs = options.silenceGapMs ?? 5000;
   const log: ScopedLogger = options.logger.scope('pipeline:queue');
   const entries: TranscriptionEntry[] = [];
 
@@ -40,6 +42,7 @@ export function createTranscriptionQueue(options: CreateTranscriptionQueueOption
   let mode: ListeningMode = 'active';
   let paused = false;
   let pauseWaiter: ((entry: TranscriptionEntry) => void) | null = null;
+  let gapTimerReset: (() => void) | null = null; // Callback to reset the accumulation gap timer
 
   /** Check for trigger phrases like "jarvis pause" / "jarvis resume" */
   function matchTrigger(text: string): 'pause' | 'resume' | null {
@@ -203,13 +206,26 @@ export function createTranscriptionQueue(options: CreateTranscriptionQueueOption
 
     while (accumulated.length < MAX_ACCUMULATION) {
       const shouldContinue = await new Promise<boolean>((resolve) => {
-        const gapTimer = setTimeout(() => {
+        let currentGapTimer = setTimeout(() => {
+          gapTimerReset = null;
           waiter = null;
           resolve(false); // Silence gap reached — done accumulating
         }, silenceGapMs);
 
+        // Allow external speech activity signals to reset the gap timer
+        gapTimerReset = () => {
+          clearTimeout(currentGapTimer);
+          currentGapTimer = setTimeout(() => {
+            gapTimerReset = null;
+            waiter = null;
+            resolve(false);
+          }, silenceGapMs);
+          log.debug('gap timer reset by speech activity');
+        };
+
         waiter = (entry: TranscriptionEntry | null) => {
-          clearTimeout(gapTimer);
+          clearTimeout(currentGapTimer);
+          gapTimerReset = null;
           if (entry !== null) {
             // Trigger phrases break accumulation immediately
             if (entry.text === '__jarvis_pause__' || entry.text === '__jarvis_resume__') {
@@ -271,5 +287,11 @@ export function createTranscriptionQueue(options: CreateTranscriptionQueueOption
     return paused;
   }
 
-  return { push, pop, waitForNext, depth, clear, setMode, getMode, isPaused: isPausedFn };
+  function notifySpeechActivity(): void {
+    if (gapTimerReset) {
+      gapTimerReset();
+    }
+  }
+
+  return { push, pop, waitForNext, notifySpeechActivity, depth, clear, setMode, getMode, isPaused: isPausedFn };
 }
