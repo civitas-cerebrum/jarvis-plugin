@@ -95,9 +95,8 @@ export function createOrchestrator(options: { dataDir: string }): Orchestrator {
   };
 
   function handleSpeechSegment(rawSamples: Float32Array): void {
-    // Skip processing while TTS is playing to keep the event loop free
-    // for streaming audio data to the play process
-    if (isSpeaking) return;
+    // During TTS playback, speaker verification filters out the TTS echo
+    // (it won't match the user's voice profile). User speech still gets through.
 
     // Denoise if available
     const samples = denoiser
@@ -374,18 +373,16 @@ export function createOrchestrator(options: { dataDir: string }): Orchestrator {
         return { spoken: false, reason: 'TTS or playback not initialized' };
       }
 
-      // Suppress speech processing and pause capture during playback so
-      // the pipeline doesn't block the event loop and starve the play
-      // process of data (causing EPIPE / truncated audio).
+      // Flag speaking state so handleSpeechSegment skips TTS echo.
+      // Capture stays active so the user can talk while we're speaking —
+      // speaker verification filters out the TTS voice (it won't match
+      // the user's profile). Playback uses temp files, so no EPIPE risk.
       isSpeaking = true;
-      capture?.stop();
 
       const result = tts.synthesize(text);
       stats.ttsCount++;
       const playResult = await playback.play(result.samples, result.sampleRate);
 
-      // Resume capture after playback completes
-      capture?.start();
       isSpeaking = false;
 
       // If Claude expects a response, switch to active mode so the next
