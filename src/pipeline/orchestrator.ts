@@ -382,15 +382,41 @@ export function createOrchestrator(options: { dataDir: string }): Orchestrator {
         return { spoken: false, reason: 'TTS or playback not initialized' };
       }
 
-      // Flag speaking state so handleSpeechSegment skips TTS echo.
-      // Capture stays active so the user can talk while we're speaking —
-      // speaker verification filters out the TTS voice (it won't match
-      // the user's profile). Playback uses temp files, so no EPIPE risk.
       isSpeaking = true;
-
-      const result = tts.synthesize(text);
       stats.ttsCount++;
-      const playResult = await playback.play(result.samples, result.sampleRate);
+
+      // Sentence-by-sentence playback: synthesize and play each sentence
+      // sequentially. The user hears the first sentence after just one
+      // sentence of synthesis time (~100-300ms) instead of waiting for
+      // the entire text to be generated.
+      let totalSamples = 0;
+      let sampleRate = 24000;
+      let interrupted = false;
+
+      const sentences = text
+        .split(/(?<=[.!?])\s+/)
+        .map(s => s.trim())
+        .filter(s => s.length > 0);
+
+      // If only one sentence or short text, skip the overhead
+      if (sentences.length <= 1) {
+        const result = tts.synthesize(text);
+        totalSamples = result.samples.length;
+        sampleRate = result.sampleRate;
+        const playResult = await playback.play(result.samples, result.sampleRate);
+        interrupted = playResult.interrupted;
+      } else {
+        for (const sentence of sentences) {
+          if (interrupted) break;
+          const result = tts.synthesize(sentence);
+          totalSamples += result.samples.length;
+          sampleRate = result.sampleRate;
+          const playResult = await playback.play(result.samples, result.sampleRate);
+          if (playResult.interrupted) {
+            interrupted = true;
+          }
+        }
+      }
 
       isSpeaking = false;
 
@@ -402,9 +428,10 @@ export function createOrchestrator(options: { dataDir: string }): Orchestrator {
 
       return {
         spoken: true,
-        interrupted: playResult.interrupted,
-        sampleRate: result.sampleRate,
-        samples: result.samples.length,
+        interrupted,
+        sampleRate,
+        samples: totalSamples,
+        sentences: sentences.length,
         listeningMode: queue.getMode(),
       };
     },

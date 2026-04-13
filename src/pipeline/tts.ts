@@ -22,6 +22,11 @@ export interface TtsResult {
 
 export interface TtsEngine {
   synthesize(text: string): TtsResult;
+  /** Generate sentences incrementally — calls onSentence for each as it's ready */
+  synthesizeStreaming(
+    text: string,
+    onSentence: (result: TtsResult, index: number, total: number) => void,
+  ): void;
   destroy(): void;
 }
 
@@ -78,6 +83,36 @@ export function createTtsEngine(options: TtsOptions): TtsEngine {
         samples: result.samples,
         sampleRate: result.sampleRate,
       };
+    },
+
+    synthesizeStreaming(
+      text: string,
+      onSentence: (result: TtsResult, index: number, total: number) => void,
+    ): void {
+      // Split into sentences, generate each one, and call back immediately
+      const sentences = text
+        .split(/(?<=[.!?])\s+/)
+        .map(s => s.trim())
+        .filter(s => s.length > 0);
+
+      if (sentences.length === 0) return;
+
+      log.debug('Streaming synthesis', { sentences: sentences.length, speakerId, speed });
+
+      for (let i = 0; i < sentences.length; i++) {
+        const synthStart = performance.now();
+        const result = tts.generate({ text: sentences[i], sid: speakerId, speed });
+        const synthMs = (performance.now() - synthStart).toFixed(1);
+        log.debug(`Sentence ${i + 1}/${sentences.length} synthesized in ${synthMs}ms`, {
+          samples: result.samples.length,
+          sampleRate: result.sampleRate,
+        });
+        onSentence(
+          { samples: result.samples, sampleRate: result.sampleRate },
+          i,
+          sentences.length,
+        );
+      }
     },
 
     destroy(): void {
