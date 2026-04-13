@@ -385,38 +385,14 @@ export function createOrchestrator(options: { dataDir: string }): Orchestrator {
       isSpeaking = true;
       stats.ttsCount++;
 
-      // Sentence-by-sentence playback: synthesize and play each sentence
-      // sequentially. The user hears the first sentence after just one
-      // sentence of synthesis time (~100-300ms) instead of waiting for
-      // the entire text to be generated.
-      let totalSamples = 0;
-      let sampleRate = 24000;
-      let interrupted = false;
-
-      const sentences = text
-        .split(/(?<=[.!?])\s+/)
-        .map(s => s.trim())
-        .filter(s => s.length > 0);
-
-      // If only one sentence or short text, skip the overhead
-      if (sentences.length <= 1) {
-        const result = tts.synthesize(text);
-        totalSamples = result.samples.length;
-        sampleRate = result.sampleRate;
-        const playResult = await playback.play(result.samples, result.sampleRate);
-        interrupted = playResult.interrupted;
-      } else {
-        for (const sentence of sentences) {
-          if (interrupted) break;
-          const result = tts.synthesize(sentence);
-          totalSamples += result.samples.length;
-          sampleRate = result.sampleRate;
-          const playResult = await playback.play(result.samples, result.sampleRate);
-          if (playResult.interrupted) {
-            interrupted = true;
-          }
-        }
-      }
+      // Synthesize the full text in one shot and play it. Single play process
+      // avoids gaps between sentences. Kokoro handles multi-sentence text
+      // natively and produces seamless audio.
+      const result = tts.synthesize(text);
+      const totalSamples = result.samples.length;
+      const sampleRate = result.sampleRate;
+      const playResult = await playback.play(result.samples, result.sampleRate);
+      const interrupted = playResult.interrupted;
 
       isSpeaking = false;
 
@@ -431,7 +407,6 @@ export function createOrchestrator(options: { dataDir: string }): Orchestrator {
         interrupted,
         sampleRate,
         samples: totalSamples,
-        sentences: sentences.length,
         listeningMode: queue.getMode(),
       };
     },
