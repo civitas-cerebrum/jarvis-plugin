@@ -344,17 +344,10 @@ export function createOrchestrator(options: { dataDir: string }): Orchestrator {
     },
 
     async listenForResponse(timeoutMs: number): Promise<Record<string, unknown>> {
-      // Listening chime — short tone via same playback path (no separate SoX)
-      if (playback && !playback.isPlaying()) {
-        const sr = 24000;
-        const dur = 0.2;
-        const chime = new Float32Array(Math.round(sr * dur));
-        for (let i = 0; i < chime.length; i++) {
-          const t = i / sr;
-          const env = Math.exp(-t * 15);
-          chime[i] = Math.sin(2 * Math.PI * 1200 * t) * 0.9 * env;
-        }
-        await playback.play(chime, sr);
+      // Listening chime — use TTS to say a short sound so it matches voice volume
+      if (tts && playback && !playback.isPlaying()) {
+        const chime = tts.synthesize('hmm');
+        await playback.play(chime.samples.subarray(0, Math.min(chime.samples.length, chime.sampleRate * 0.3)), chime.sampleRate);
       }
 
       const entry = await queue.waitForNext(timeoutMs);
@@ -362,17 +355,10 @@ export function createOrchestrator(options: { dataDir: string }): Orchestrator {
         return { heard: false, reason: 'timeout', listeningMode: queue.getMode(), paused: queue.isPaused() };
       }
 
-      // Received chime — lower pitch
-      if (playback && !playback.isPlaying()) {
-        const sr = 24000;
-        const dur = 0.15;
-        const chime = new Float32Array(Math.round(sr * dur));
-        for (let i = 0; i < chime.length; i++) {
-          const t = i / sr;
-          const env = Math.exp(-t * 20);
-          chime[i] = Math.sin(2 * Math.PI * 800 * t) * 0.9 * env;
-        }
-        await playback.play(chime, sr);
+      // Received chime — short TTS sound
+      if (tts && playback && !playback.isPlaying()) {
+        const chime = tts.synthesize('mm');
+        await playback.play(chime.samples.subarray(0, Math.min(chime.samples.length, chime.sampleRate * 0.2)), chime.sampleRate);
       }
 
       // Handle trigger phrases
