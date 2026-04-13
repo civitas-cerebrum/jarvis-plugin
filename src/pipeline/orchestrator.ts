@@ -341,6 +341,20 @@ export function createOrchestrator(options: { dataDir: string }): Orchestrator {
     },
 
     async listenForResponse(timeoutMs: number): Promise<Record<string, unknown>> {
+      // Play a subtle listening indicator tone so the user knows we're ready
+      if (playback && !playback.isPlaying()) {
+        const sampleRate = 24000;
+        const duration = 0.15; // 150ms
+        const freq = 880; // A5 note
+        const samples = new Float32Array(Math.round(sampleRate * duration));
+        for (let i = 0; i < samples.length; i++) {
+          const t = i / sampleRate;
+          const envelope = Math.min(1, (samples.length - i) / (sampleRate * 0.05)); // fade out
+          samples[i] = Math.sin(2 * Math.PI * freq * t) * 0.15 * envelope;
+        }
+        await playback.play(samples, sampleRate);
+      }
+
       const entry = await queue.waitForNext(timeoutMs);
       if (entry === null) {
         return { heard: false, reason: 'timeout', listeningMode: queue.getMode() };
