@@ -344,45 +344,9 @@ export function createOrchestrator(options: { dataDir: string }): Orchestrator {
     },
 
     async listenForResponse(timeoutMs: number): Promise<Record<string, unknown>> {
-      // Warm sine chime via SoX synth — much richer than raw waveform (fire-and-forget)
-      if (!playback?.isPlaying()) {
-        try {
-          const { spawn } = await import('node:child_process');
-          const chimeProc = spawn('play', [
-            '-q', '-n',
-            'synth', '0.2', 'sine', '1400',
-            'fade', 't', '0', '0.2', '0.15',
-            'tremolo', '20',
-            'vol', '1.0',
-          ], { stdio: 'ignore' });
-          chimeProc.on('error', () => { /* non-critical */ });
-        } catch {
-          // Chime is non-critical — don't block on failure
-        }
-      }
-
       const entry = await queue.waitForNext(timeoutMs);
       if (entry === null) {
         return { heard: false, reason: 'timeout', listeningMode: queue.getMode(), paused: queue.isPaused() };
-      }
-
-      // "Received" chime — lower tone confirms message was captured (brief await)
-      try {
-        const { spawn } = await import('node:child_process');
-        await new Promise<void>((resolve) => {
-          const chimeProc = spawn('play', [
-            '-q', '-n',
-            'synth', '0.12', 'sine', '1000',
-            'fade', 't', '0', '0.12', '0.08',
-            'tremolo', '15',
-            'vol', '1.0',
-          ], { stdio: 'ignore' });
-          const timeout = setTimeout(() => resolve(), 2000);
-          chimeProc.on('close', () => { clearTimeout(timeout); resolve(); });
-          chimeProc.on('error', () => { clearTimeout(timeout); resolve(); });
-        });
-      } catch {
-        // Non-critical
       }
 
       // Handle trigger phrases
