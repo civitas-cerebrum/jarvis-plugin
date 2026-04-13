@@ -25,15 +25,15 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-tiny.en.tar.bz2",
     extractDir: "whisper-small",
     sizeMb: 150,
-    files: ["tiny-encoder.onnx", "tiny-decoder.onnx", "tokens.txt"],
+    files: ["tiny.en-encoder.onnx", "tiny.en-decoder.onnx", "tiny.en-tokens.txt"],
   },
   {
     name: "tts-kokoro",
     description: "Kokoro TTS",
-    url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/kokoro-en-v1.0.tar.bz2",
+    url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-en_US-amy-low.tar.bz2",
     extractDir: "tts-kokoro",
-    sizeMb: 100,
-    files: ["kokoro-v1.0.onnx", "voices-v1.0.bin", "tokens.txt"],
+    sizeMb: 60,
+    files: ["en_US-amy-low.onnx", "tokens.txt"],
   },
   {
     name: "speaker-id",
@@ -54,7 +54,7 @@ export function getModelEntry(name: string): ModelEntry | undefined {
 }
 
 export function isModelPresent(dataDir: string, model: ModelEntry): boolean {
-  const modelDir = getModelPath(dataDir, model.name);
+  const modelDir = getModelPath(dataDir, model.extractDir);
   return model.files.every((file) => existsSync(join(modelDir, file)));
 }
 

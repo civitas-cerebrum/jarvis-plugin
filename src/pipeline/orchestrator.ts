@@ -171,10 +171,9 @@ export function createOrchestrator(options: { dataDir: string }): Orchestrator {
     const sttModelDir = getModelPath(dataDir, 'whisper-small');
     stt = createSttEngine({
       modelConfig: {
-        encoder: join(sttModelDir, 'tiny-encoder.onnx'),
-        decoder: join(sttModelDir, 'tiny-decoder.onnx'),
-        joiner: join(sttModelDir, 'tiny-joiner.onnx'),
-        tokens: join(sttModelDir, 'tokens.txt'),
+        encoder: join(sttModelDir, 'tiny.en-encoder.onnx'),
+        decoder: join(sttModelDir, 'tiny.en-decoder.onnx'),
+        tokens: join(sttModelDir, 'tiny.en-tokens.txt'),
       },
       logger,
     });
@@ -190,8 +189,8 @@ export function createOrchestrator(options: { dataDir: string }): Orchestrator {
 
     const ttsModelDir = getModelPath(dataDir, 'tts-kokoro');
     tts = createTtsEngine({
-      modelPath: join(ttsModelDir, 'kokoro-v1.0.onnx'),
-      voicesPath: join(ttsModelDir, 'voices-v1.0.bin'),
+      modelPath: join(ttsModelDir, 'en_US-amy-low.onnx'),
+      voicesPath: join(ttsModelDir, 'espeak-ng-data'),
       tokensPath: join(ttsModelDir, 'tokens.txt'),
       logger,
     });

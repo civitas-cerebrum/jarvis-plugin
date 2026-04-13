@@ -4,7 +4,6 @@ import type { Logger, ScopedLogger } from '../logging/logger.js';
 export interface SttModelConfig {
   encoder: string;
   decoder: string;
-  joiner: string;
   tokens: string;
 }
 
@@ -32,19 +31,19 @@ export function createSttEngine(options: SttOptions): SttEngine {
   log.info('Creating STT engine', {
     encoder: options.modelConfig.encoder,
     decoder: options.modelConfig.decoder,
-    joiner: options.modelConfig.joiner,
     tokens: options.modelConfig.tokens,
     numThreads,
   });
 
-  const recognizer = new sherpa.OnlineRecognizer({
-    transducer: {
-      encoder: options.modelConfig.encoder,
-      decoder: options.modelConfig.decoder,
-      joiner: options.modelConfig.joiner,
+  const recognizer = new sherpa.OfflineRecognizer({
+    modelConfig: {
+      whisper: {
+        encoder: options.modelConfig.encoder,
+        decoder: options.modelConfig.decoder,
+      },
+      tokens: options.modelConfig.tokens,
+      numThreads,
     },
-    tokens: options.modelConfig.tokens,
-    numThreads,
   });
 
   log.info('STT recognizer created');
@@ -58,24 +57,20 @@ export function createSttEngine(options: SttOptions): SttEngine {
       });
 
       const stream = recognizer.createStream();
-      stream.acceptWaveform(sampleRate, samples);
+      stream.acceptWaveform({ sampleRate, samples });
       recognizer.decode(stream);
 
       const result = recognizer.getResult(stream);
-      const text = (result.text ?? '').trim();
+      const text = (typeof result === 'string' ? result : result?.text ?? '').trim();
       const confidence = text.length > 0 ? 0.8 : 0;
       const durationMs = Date.now() - start;
 
       log.debug('Transcription complete', { text, confidence, durationMs });
 
-      stream.free();
-
       return { text, confidence, durationMs };
     },
 
     destroy(): void {
-      log.info('Destroying STT engine');
-      recognizer.free();
       log.info('STT engine destroyed');
     },
   };

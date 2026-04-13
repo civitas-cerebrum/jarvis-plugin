@@ -13,7 +13,7 @@ declare module 'sherpa-onnx-node' {
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  class OnlineRecognizer {
+  class OfflineRecognizer {
     constructor(config: any);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     createStream(): any;
@@ -55,7 +55,7 @@ declare module 'sherpa-onnx-node' {
 
   const _default: {
     Vad: typeof Vad;
-    OnlineRecognizer: typeof OnlineRecognizer;
+    OfflineRecognizer: typeof OfflineRecognizer;
     OfflineTts: typeof OfflineTts;
     SpeakerEmbeddingExtractor: typeof SpeakerEmbeddingExtractor;
     SpeakerEmbeddingManager: typeof SpeakerEmbeddingManager;

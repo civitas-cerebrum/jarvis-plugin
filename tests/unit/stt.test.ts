@@ -2,19 +2,17 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const mockStream = {
   acceptWaveform: vi.fn(),
-  free: vi.fn(),
 };
 
 const mockRecognizer = {
   createStream: vi.fn(() => mockStream),
   decode: vi.fn(),
   getResult: vi.fn(() => ({ text: 'hello world' })),
-  free: vi.fn(),
 };
 
 vi.mock('sherpa-onnx-node', () => ({
   default: {
-    OnlineRecognizer: vi.fn(() => mockRecognizer),
+    OfflineRecognizer: vi.fn(() => mockRecognizer),
   },
 }));
 
@@ -33,7 +31,6 @@ describe('SttEngine', () => {
       modelConfig: {
         encoder: 'encoder.onnx',
         decoder: 'decoder.onnx',
-        joiner: 'joiner.onnx',
         tokens: 'tokens.txt',
       },
       logger: createLogger({ level: LogLevel.DEBUG, ringBufferSize: 100 }),
@@ -56,20 +53,17 @@ describe('SttEngine', () => {
     const result = await engine.transcribeSegment(samples, sampleRate);
 
     expect(mockRecognizer.createStream).toHaveBeenCalled();
-    expect(mockStream.acceptWaveform).toHaveBeenCalledWith(sampleRate, samples);
+    expect(mockStream.acceptWaveform).toHaveBeenCalledWith({ sampleRate, samples });
     expect(mockRecognizer.decode).toHaveBeenCalledWith(mockStream);
     expect(mockRecognizer.getResult).toHaveBeenCalledWith(mockStream);
-    expect(mockStream.free).toHaveBeenCalled();
 
     expect(result.text).toBe('hello world');
     expect(result.confidence).toBe(0.8);
     expect(result.durationMs).toBeGreaterThanOrEqual(0);
   });
 
-  it('destroy frees native resources', () => {
+  it('destroy does not throw', () => {
     const engine = createSttEngine(options);
-    engine.destroy();
-
-    expect(mockRecognizer.free).toHaveBeenCalled();
+    expect(() => engine.destroy()).not.toThrow();
   });
 });

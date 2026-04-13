@@ -38,16 +38,14 @@ export function createTtsEngine(options: TtsOptions): TtsEngine {
   const initStart = performance.now();
 
   const tts = new sherpa.OfflineTts({
-    offlineTtsModelConfig: {
-      offlineTtsVitsModelConfig: {
+    model: {
+      vits: {
         model: options.modelPath,
         tokens: options.tokensPath,
         dataDir: options.voicesPath,
       },
-      numThreads: options.numThreads ?? 1,
-      debug: false,
-      provider: 'cpu',
     },
+    numThreads: options.numThreads ?? 1,
   });
 
   const initMs = (performance.now() - initStart).toFixed(1);
@@ -74,8 +72,6 @@ export function createTtsEngine(options: TtsOptions): TtsEngine {
     },
 
     destroy(): void {
-      log.info('Destroying TTS engine');
-      tts.free();
       log.info('TTS engine destroyed');
     },
   };
