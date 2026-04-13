@@ -27,14 +27,14 @@ export interface CreateTranscriptionQueueOptions {
   maxDepth: number;
   logger: Logger;
   wakeWord?: string;
-  /** Silence gap (ms) before returning accumulated speech. Default: 5000 */
+  /** Silence gap (ms) before returning accumulated speech. Default: 2500 */
   silenceGapMs?: number;
 }
 
 export function createTranscriptionQueue(options: CreateTranscriptionQueueOptions): TranscriptionQueue {
   const { maxDepth } = options;
   const wakeWord = (options.wakeWord ?? 'jarvis').toLowerCase();
-  const silenceGapMs = options.silenceGapMs ?? 5000;
+  const silenceGapMs = options.silenceGapMs ?? 2500;
   const log: ScopedLogger = options.logger.scope('pipeline:queue');
   const entries: TranscriptionEntry[] = [];
 

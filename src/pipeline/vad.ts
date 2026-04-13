@@ -27,7 +27,7 @@ export function createVadPipeline(options: VadOptions): VadPipeline {
     threshold,
     logger,
     sampleRate = 16000,
-    minSilenceDuration = 0.5,
+    minSilenceDuration = 1.5,
     minSpeechDuration = 0.25,
     onSpeechSegment,
     _vadInstance,
