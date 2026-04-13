@@ -87,6 +87,19 @@ The user should NEVER have to reach for the keyboard during voice mode.
 - **If the user types instead of speaking:** Honor the typed input, then resume
   the voice loop.
 
+### Pause/Resume
+
+When `ListenForResponse` returns `__jarvis_pause__`:
+1. Announce "Paused" via `SpeakText`
+2. **Keep calling `ListenForResponse(timeout_ms: 10000)` in a loop** — do NOT
+   stop polling. The plugin drops all speech while paused except "Jarvis resume."
+3. When `ListenForResponse` returns `__jarvis_resume__`, announce "Resumed" and
+   return to the normal voice loop.
+4. If the user types "resume", also resume the voice loop.
+
+**Never fully stop the loop on pause.** The resume voice command only works if
+you keep polling.
+
 ## How To Speak
 
 - **2-3 sentences max.** The terminal has the full output — don't read it aloud.
