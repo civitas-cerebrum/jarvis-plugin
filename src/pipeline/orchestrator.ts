@@ -336,6 +336,7 @@ export function createOrchestrator(options: { dataDir: string }): Orchestrator {
         queueDepth: queue.depth(),
         consecutiveRejections: stats.consecutiveRejections,
         listeningMode: queue.getMode(),
+        paused: queue.isPaused(),
       };
     },
 
@@ -356,7 +357,14 @@ export function createOrchestrator(options: { dataDir: string }): Orchestrator {
 
       const entry = await queue.waitForNext(timeoutMs);
       if (entry === null) {
-        return { heard: false, reason: 'timeout', listeningMode: queue.getMode() };
+        return { heard: false, reason: 'timeout', listeningMode: queue.getMode(), paused: queue.isPaused() };
+      }
+      // Handle trigger phrases
+      if (entry.text === '__jarvis_pause__') {
+        return { heard: true, text: '__jarvis_pause__', paused: true, listeningMode: queue.getMode() };
+      }
+      if (entry.text === '__jarvis_resume__') {
+        return { heard: true, text: '__jarvis_resume__', resumed: true, listeningMode: queue.getMode() };
       }
       return {
         heard: true,
@@ -365,6 +373,7 @@ export function createOrchestrator(options: { dataDir: string }): Orchestrator {
         durationMs: entry.durationMs,
         lowQuality: entry.lowQuality,
         listeningMode: queue.getMode(),
+        paused: queue.isPaused(),
       };
     },
 

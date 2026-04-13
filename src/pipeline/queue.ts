@@ -18,6 +18,7 @@ export interface TranscriptionQueue {
   clear(): void;
   setMode(mode: ListeningMode): void;
   getMode(): ListeningMode;
+  isPaused(): boolean;
 }
 
 export interface CreateTranscriptionQueueOptions {
@@ -34,6 +35,24 @@ export function createTranscriptionQueue(options: CreateTranscriptionQueueOption
 
   let waiter: ((entry: TranscriptionEntry | null) => void) | null = null;
   let mode: ListeningMode = 'active';
+  let paused = false;
+  let pauseWaiter: ((entry: TranscriptionEntry) => void) | null = null;
+
+  /** Check for trigger phrases like "jarvis pause" / "jarvis resume" */
+  function matchTrigger(text: string): 'pause' | 'resume' | null {
+    const lower = text.toLowerCase().trim().replace(/[,.:!?]/g, '');
+    const pausePatterns = [
+      `${wakeWord} pause`, `${wakeWord} mute`, `${wakeWord} stop listening`,
+      `hey ${wakeWord} pause`, `hey ${wakeWord} mute`,
+    ];
+    const resumePatterns = [
+      `${wakeWord} resume`, `${wakeWord} unmute`, `${wakeWord} start listening`,
+      `hey ${wakeWord} resume`, `hey ${wakeWord} unmute`,
+    ];
+    if (pausePatterns.some(p => lower.includes(p))) return 'pause';
+    if (resumePatterns.some(p => lower.includes(p))) return 'resume';
+    return null;
+  }
 
   /** Check if text starts with the wake word, return stripped text or null */
   function matchWakeWord(text: string): string | null {
@@ -52,6 +71,53 @@ export function createTranscriptionQueue(options: CreateTranscriptionQueueOption
   }
 
   function push(entry: TranscriptionEntry): void {
+    // Always check for trigger phrases, even when paused
+    const trigger = matchTrigger(entry.text);
+    if (trigger === 'pause' && !paused) {
+      paused = true;
+      log.info('PAUSED by trigger phrase', { text: entry.text });
+      // Deliver a synthetic pause entry so Claude knows
+      const pauseEntry: TranscriptionEntry = {
+        ...entry,
+        text: '__jarvis_pause__',
+      };
+      if (waiter) {
+        const resolve = waiter;
+        waiter = null;
+        resolve(pauseEntry);
+      } else {
+        entries.push(pauseEntry);
+      }
+      return;
+    }
+    if (trigger === 'resume' && paused) {
+      paused = false;
+      log.info('RESUMED by trigger phrase', { text: entry.text });
+      // Deliver a synthetic resume entry — also wake up pauseWaiter
+      const resumeEntry: TranscriptionEntry = {
+        ...entry,
+        text: '__jarvis_resume__',
+      };
+      if (pauseWaiter) {
+        const resolve = pauseWaiter;
+        pauseWaiter = null;
+        resolve(resumeEntry);
+      } else if (waiter) {
+        const resolve = waiter;
+        waiter = null;
+        resolve(resumeEntry);
+      } else {
+        entries.push(resumeEntry);
+      }
+      return;
+    }
+
+    // While paused, drop everything except resume trigger (handled above)
+    if (paused) {
+      log.debug('push: dropped (paused)', { text: entry.text });
+      return;
+    }
+
     // In wake-word mode, filter entries that don't contain the wake word
     if (mode === 'wake-word') {
       const stripped = matchWakeWord(entry.text);
@@ -143,5 +209,9 @@ export function createTranscriptionQueue(options: CreateTranscriptionQueueOption
     return mode;
   }
 
-  return { push, pop, waitForNext, depth, clear, setMode, getMode };
+  function isPausedFn(): boolean {
+    return paused;
+  }
+
+  return { push, pop, waitForNext, depth, clear, setMode, getMode, isPaused: isPausedFn };
 }
