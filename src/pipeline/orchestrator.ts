@@ -368,9 +368,8 @@ export function createOrchestrator(options: { dataDir: string }): Orchestrator {
     },
 
     async setMode(mode: string): Promise<Record<string, unknown>> {
-      const valid = ['vad', 'push-to-talk', 'wake-word'] as const;
-      if (!valid.includes(mode as typeof valid[number])) {
-        return { error: `Invalid mode: ${mode}` };
+      if (mode !== 'vad') {
+        throw new Error(`Mode "${mode}" is not supported in v0.1. Only "vad" is available.`);
       }
       (config as { mode: string }).mode = mode;
       saveConfig(dataDir, config);
@@ -382,6 +381,9 @@ export function createOrchestrator(options: { dataDir: string }): Orchestrator {
       parameter: string,
       value: number,
     ): Promise<Record<string, unknown>> {
+      if (value < 0 || value > 1) {
+        throw new Error('Threshold must be between 0.0 and 1.0');
+      }
       if (parameter === 'vad_sensitivity') {
         config.vadSensitivity = value;
         vad?.setThreshold(value);

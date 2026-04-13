@@ -1,4 +1,4 @@
-import { Vad } from 'sherpa-onnx-node';
+import sherpa from 'sherpa-onnx-node';
 import type { ScopedLogger } from '../logging/logger.js';
 
 export interface VadOptions {
@@ -10,7 +10,8 @@ export interface VadOptions {
   minSpeechDuration?: number;
   onSpeechSegment?: (samples: Float32Array) => void;
   /** @internal Allows injecting a mock Vad instance for testing. */
-  _vadInstance?: Vad;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  _vadInstance?: any;
 }
 
 export interface VadPipeline {
@@ -40,7 +41,8 @@ export function createVadPipeline(options: VadOptions): VadPipeline {
     minSpeechDuration,
   });
 
-  const vad: Vad = _vadInstance ?? new Vad({
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const vad: any = _vadInstance ?? new sherpa.Vad({
     sileroVad: {
       model: modelPath,
       threshold,

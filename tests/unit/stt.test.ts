@@ -13,7 +13,9 @@ const mockRecognizer = {
 };
 
 vi.mock('sherpa-onnx-node', () => ({
-  OnlineRecognizer: vi.fn(() => mockRecognizer),
+  default: {
+    OnlineRecognizer: vi.fn(() => mockRecognizer),
+  },
 }));
 
 import { createSttEngine } from '../../src/pipeline/stt.js';

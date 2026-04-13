@@ -4,10 +4,12 @@ const mockGenerate = vi.fn();
 const mockFree = vi.fn();
 
 vi.mock('sherpa-onnx-node', () => ({
-  OfflineTts: vi.fn(() => ({
-    generate: mockGenerate,
-    free: mockFree,
-  })),
+  default: {
+    OfflineTts: vi.fn(() => ({
+      generate: mockGenerate,
+      free: mockFree,
+    })),
+  },
 }));
 
 import { createTtsEngine } from '../../src/pipeline/tts.js';

@@ -1,6 +1,6 @@
 declare module 'sherpa-onnx-node' {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  export class Vad {
+  class Vad {
     constructor(config: any);
     acceptWaveform(samples: Float32Array): void;
     isEmpty(): boolean;
@@ -13,7 +13,7 @@ declare module 'sherpa-onnx-node' {
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  export class OnlineRecognizer {
+  class OnlineRecognizer {
     constructor(config: any);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     createStream(): any;
@@ -25,7 +25,7 @@ declare module 'sherpa-onnx-node' {
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  export class OfflineTts {
+  class OfflineTts {
     constructor(config: any);
     generate(options: { text: string; sid: number; speed: number }): {
       samples: Float32Array;
@@ -34,7 +34,7 @@ declare module 'sherpa-onnx-node' {
     free(): void;
   }
 
-  export class SpeakerEmbeddingExtractor {
+  class SpeakerEmbeddingExtractor {
     constructor(config: { model: string; numThreads?: number; debug?: boolean });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     createStream(): any;
@@ -44,12 +44,23 @@ declare module 'sherpa-onnx-node' {
     free?(): void;
   }
 
-  export class SpeakerEmbeddingManager {
+  class SpeakerEmbeddingManager {
     constructor(dim: number);
     addMulti(options: { name: string; v: Float32Array[] }): boolean;
     search(options: { v: Float32Array; threshold: number }): string;
     verify(options: { name: string; v: Float32Array; threshold: number }): boolean;
   }
 
-  export function readWave(path: string): { samples: Float32Array; sampleRate: number };
+  function readWave(path: string): { samples: Float32Array; sampleRate: number };
+
+  const _default: {
+    Vad: typeof Vad;
+    OnlineRecognizer: typeof OnlineRecognizer;
+    OfflineTts: typeof OfflineTts;
+    SpeakerEmbeddingExtractor: typeof SpeakerEmbeddingExtractor;
+    SpeakerEmbeddingManager: typeof SpeakerEmbeddingManager;
+    readWave: typeof readWave;
+  };
+
+  export default _default;
 }

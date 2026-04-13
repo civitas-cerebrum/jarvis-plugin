@@ -1,4 +1,4 @@
-import { OfflineTts } from 'sherpa-onnx-node';
+import sherpa from 'sherpa-onnx-node';
 import type { Logger, ScopedLogger } from '../logging/logger.js';
 
 export interface TtsOptions {
@@ -37,7 +37,7 @@ export function createTtsEngine(options: TtsOptions): TtsEngine {
 
   const initStart = performance.now();
 
-  const tts = new OfflineTts({
+  const tts = new sherpa.OfflineTts({
     offlineTtsModelConfig: {
       offlineTtsVitsModelConfig: {
         model: options.modelPath,

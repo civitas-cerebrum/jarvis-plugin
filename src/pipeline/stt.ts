@@ -1,4 +1,4 @@
-import { OnlineRecognizer } from 'sherpa-onnx-node';
+import sherpa from 'sherpa-onnx-node';
 import type { Logger, ScopedLogger } from '../logging/logger.js';
 
 export interface SttModelConfig {
@@ -37,7 +37,7 @@ export function createSttEngine(options: SttOptions): SttEngine {
     numThreads,
   });
 
-  const recognizer = new OnlineRecognizer({
+  const recognizer = new sherpa.OnlineRecognizer({
     transducer: {
       encoder: options.modelConfig.encoder,
       decoder: options.modelConfig.decoder,

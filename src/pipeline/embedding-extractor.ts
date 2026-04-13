@@ -1,4 +1,4 @@
-import { SpeakerEmbeddingExtractor } from 'sherpa-onnx-node';
+import sherpa from 'sherpa-onnx-node';
 import type { Logger, ScopedLogger } from '../logging/logger.js';
 
 export interface EmbeddingExtractorOptions {
@@ -21,7 +21,7 @@ export function createEmbeddingExtractor(
 
   log.info('Creating speaker embedding extractor', { modelPath, numThreads });
 
-  const extractor = new SpeakerEmbeddingExtractor({
+  const extractor = new sherpa.SpeakerEmbeddingExtractor({
     model: modelPath,
     numThreads,
     debug: false,
