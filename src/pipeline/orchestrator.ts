@@ -344,9 +344,35 @@ export function createOrchestrator(options: { dataDir: string }): Orchestrator {
     },
 
     async listenForResponse(timeoutMs: number): Promise<Record<string, unknown>> {
+      // Listening chime — short tone via same playback path (no separate SoX)
+      if (playback && !playback.isPlaying()) {
+        const sr = 24000;
+        const dur = 0.12;
+        const chime = new Float32Array(Math.round(sr * dur));
+        for (let i = 0; i < chime.length; i++) {
+          const t = i / sr;
+          const env = Math.exp(-t * 25);
+          chime[i] = Math.sin(2 * Math.PI * 1200 * t) * 0.12 * env;
+        }
+        await playback.play(chime, sr);
+      }
+
       const entry = await queue.waitForNext(timeoutMs);
       if (entry === null) {
         return { heard: false, reason: 'timeout', listeningMode: queue.getMode(), paused: queue.isPaused() };
+      }
+
+      // Received chime — lower pitch
+      if (playback && !playback.isPlaying()) {
+        const sr = 24000;
+        const dur = 0.1;
+        const chime = new Float32Array(Math.round(sr * dur));
+        for (let i = 0; i < chime.length; i++) {
+          const t = i / sr;
+          const env = Math.exp(-t * 30);
+          chime[i] = Math.sin(2 * Math.PI * 800 * t) * 0.12 * env;
+        }
+        await playback.play(chime, sr);
       }
 
       // Handle trigger phrases
