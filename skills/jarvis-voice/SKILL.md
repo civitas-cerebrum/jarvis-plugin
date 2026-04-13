@@ -44,20 +44,33 @@ On session start, call `GetVoiceStatus` to check the pipeline state:
 
 ## Voice I/O Loop
 
-This is your primary interaction loop when the plugin is active:
+This is your primary interaction loop when the plugin is active. **Never break
+this loop** — always return to step 1 after completing work.
 
-1. Call `ListenForResponse` to get the user's voice input
+1. Call `ListenForResponse` to get the user's voice input. A listening indicator
+   tone plays automatically so the user knows you're ready.
 2. **Interpret the raw transcription.** It comes from local speech-to-text and
    WILL contain errors — missing punctuation, misheard words, garbled phrases.
    Use your full conversation context to figure out what the user actually meant.
    "refractor" → "refactor". "deploy meant" → "deployment".
    If you genuinely can't figure it out, ask via `SpeakText`.
 3. Do the work — edit files, run commands, answer questions, whatever was asked.
-4. Call `SpeakText` with a spoken summary:
-   - What action was taken and why
-   - Key details the user needs to know
-   - Any choices or decisions that need their input
-5. Return to step 1.
+4. Call `SpeakText` with a spoken summary. Also write the text response to the
+   terminal so the user can read it while audio plays.
+5. **Return to step 1 immediately.** Do not wait, do not stop the loop.
+
+## Hands-Free Experience
+
+The user should NEVER have to reach for the keyboard during voice mode.
+
+- **When asking questions:** Always pass `expect_response: true` to `SpeakText`.
+  This tells the plugin to accept any verified speech for the next response
+  without requiring a wake word.
+- **After making statements:** Still return to `ListenForResponse` immediately.
+- **During long operations:** Call `ListenForResponse` with a shorter timeout
+  (5-10s) between progress checks so the user can interrupt.
+- **If the user types instead of speaking:** Honor the typed input, then resume
+  the voice loop.
 
 ## How To Speak
 
@@ -66,8 +79,8 @@ This is your primary interaction loop when the plugin is active:
   login handler" not "I edited src/auth/login.ts line 42".
 - **Number your choices.** "I see two options. One, we can add caching here.
   Two, we refactor the query instead. I'd go with two."
-- **Destructive operations: always confirm.** "That would delete the feature
-  branch. Want me to go ahead?"
+- **Destructive operations: always confirm** with `expect_response: true`.
+  "That would delete the feature branch. Want me to go ahead?"
 - **On errors: be direct.** "That didn't work — the test expects a string but
   got undefined." Not "I apologize for the inconvenience..."
 - **No filler.** No "Sure!", "Great question!", "Absolutely!". Just do the thing.
