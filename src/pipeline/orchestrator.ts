@@ -344,10 +344,18 @@ export function createOrchestrator(options: { dataDir: string }): Orchestrator {
     },
 
     async listenForResponse(timeoutMs: number): Promise<Record<string, unknown>> {
-      // Listening chime — use TTS to say a short sound so it matches voice volume
-      if (tts && playback && !playback.isPlaying()) {
-        const chime = tts.synthesize('hmm');
-        await playback.play(chime.samples.subarray(0, Math.min(chime.samples.length, chime.sampleRate * 0.3)), chime.sampleRate);
+      // Listening chime — original working implementation: 880Hz, 150ms
+      if (playback && !playback.isPlaying()) {
+        const sampleRate = 24000;
+        const duration = 0.15;
+        const freq = 880;
+        const samples = new Float32Array(Math.round(sampleRate * duration));
+        for (let i = 0; i < samples.length; i++) {
+          const t = i / sampleRate;
+          const envelope = Math.min(1, (samples.length - i) / (sampleRate * 0.05));
+          samples[i] = Math.sin(2 * Math.PI * freq * t) * 0.15 * envelope;
+        }
+        await playback.play(samples, sampleRate);
       }
 
       const entry = await queue.waitForNext(timeoutMs);
@@ -355,10 +363,18 @@ export function createOrchestrator(options: { dataDir: string }): Orchestrator {
         return { heard: false, reason: 'timeout', listeningMode: queue.getMode(), paused: queue.isPaused() };
       }
 
-      // Received chime — short TTS sound
-      if (tts && playback && !playback.isPlaying()) {
-        const chime = tts.synthesize('mm');
-        await playback.play(chime.samples.subarray(0, Math.min(chime.samples.length, chime.sampleRate * 0.2)), chime.sampleRate);
+      // Received chime — lower pitch version
+      if (playback && !playback.isPlaying()) {
+        const sampleRate = 24000;
+        const duration = 0.12;
+        const freq = 660;
+        const samples = new Float32Array(Math.round(sampleRate * duration));
+        for (let i = 0; i < samples.length; i++) {
+          const t = i / sampleRate;
+          const envelope = Math.min(1, (samples.length - i) / (sampleRate * 0.04));
+          samples[i] = Math.sin(2 * Math.PI * freq * t) * 0.15 * envelope;
+        }
+        await playback.play(samples, sampleRate);
       }
 
       // Handle trigger phrases
