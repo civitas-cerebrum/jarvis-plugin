@@ -1,19 +1,5 @@
+import { Vad } from 'sherpa-onnx-node';
 import type { ScopedLogger } from '../logging/logger.js';
-
-interface SherpaVad {
-  acceptWaveform(samples: Float32Array): void;
-  isEmpty(): boolean;
-  isDetected(): boolean;
-  front(): { samples: Float32Array; start: number };
-  pop(): void;
-  reset(): void;
-  flush(): void;
-  free(): void;
-}
-
-interface SherpaModule {
-  createVad(config: unknown): SherpaVad;
-}
 
 export interface VadOptions {
   modelPath: string;
@@ -23,8 +9,8 @@ export interface VadOptions {
   minSilenceDuration?: number;
   minSpeechDuration?: number;
   onSpeechSegment?: (samples: Float32Array) => void;
-  /** @internal Allows injecting a mock sherpa module for testing. */
-  _sherpaModule?: SherpaModule;
+  /** @internal Allows injecting a mock Vad instance for testing. */
+  _vadInstance?: Vad;
 }
 
 export interface VadPipeline {
@@ -43,11 +29,8 @@ export function createVadPipeline(options: VadOptions): VadPipeline {
     minSilenceDuration = 0.5,
     minSpeechDuration = 0.25,
     onSpeechSegment,
-    _sherpaModule,
+    _vadInstance,
   } = options;
-
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const sherpa: SherpaModule = _sherpaModule ?? (require('sherpa-onnx') as SherpaModule);
 
   logger.info('Creating VAD pipeline', {
     modelPath,
@@ -57,7 +40,7 @@ export function createVadPipeline(options: VadOptions): VadPipeline {
     minSpeechDuration,
   });
 
-  const vad: SherpaVad = sherpa.createVad({
+  const vad: Vad = _vadInstance ?? new Vad({
     sileroVad: {
       model: modelPath,
       threshold,

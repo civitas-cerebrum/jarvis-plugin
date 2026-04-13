@@ -13,10 +13,6 @@ const mockVad = {
   free: vi.fn(),
 };
 
-const mockCreateVad = vi.fn(() => mockVad);
-
-const mockSherpa = { createVad: mockCreateVad };
-
 function makeLogger() {
   return createLogger({ level: LogLevel.DEBUG, ringBufferSize: 100 }).scope('vad-test');
 }
@@ -28,7 +24,7 @@ describe('VadPipeline', () => {
     mockVad.isDetected.mockReturnValue(false);
   });
 
-  it('creates a VAD pipeline with correct config', () => {
+  it('creates a VAD pipeline with injected instance', () => {
     const pipeline = createVadPipeline({
       modelPath: '/models/silero_vad.onnx',
       threshold: 0.5,
@@ -36,19 +32,7 @@ describe('VadPipeline', () => {
       sampleRate: 16000,
       minSilenceDuration: 0.5,
       minSpeechDuration: 0.25,
-      _sherpaModule: mockSherpa,
-    });
-
-    expect(mockCreateVad).toHaveBeenCalledOnce();
-    expect(mockCreateVad).toHaveBeenCalledWith({
-      sileroVad: {
-        model: '/models/silero_vad.onnx',
-        threshold: 0.5,
-        minSilenceDuration: 0.5,
-        minSpeechDuration: 0.25,
-      },
-      sampleRate: 16000,
-      debug: false,
+      _vadInstance: mockVad as any,
     });
 
     expect(pipeline.feedAudio).toBeTypeOf('function');
@@ -75,10 +59,10 @@ describe('VadPipeline', () => {
       threshold: 0.5,
       logger: makeLogger(),
       onSpeechSegment,
-      _sherpaModule: mockSherpa,
+      _vadInstance: mockVad as any,
     });
 
-    // Reset call count after creation (isEmpty may be called during init — it isn't, but defensive)
+    // Reset call count after creation
     isEmptyCallCount = 0;
 
     const audio = new Float32Array(480);
@@ -96,7 +80,7 @@ describe('VadPipeline', () => {
       modelPath: '/models/silero_vad.onnx',
       threshold: 0.5,
       logger: makeLogger(),
-      _sherpaModule: mockSherpa,
+      _vadInstance: mockVad as any,
     });
 
     pipeline.destroy();

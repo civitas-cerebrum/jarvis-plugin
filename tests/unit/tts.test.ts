@@ -3,8 +3,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const mockGenerate = vi.fn();
 const mockFree = vi.fn();
 
-vi.mock('sherpa-onnx', () => ({
-  createOfflineTts: vi.fn(() => ({
+vi.mock('sherpa-onnx-node', () => ({
+  OfflineTts: vi.fn(() => ({
     generate: mockGenerate,
     free: mockFree,
   })),
