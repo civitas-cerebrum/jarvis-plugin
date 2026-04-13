@@ -402,14 +402,53 @@ export function createOrchestrator(options: { dataDir: string }): Orchestrator {
       isSpeaking = true;
       stats.ttsCount++;
 
-      // Synthesize the full text in one shot and play it. Single play process
-      // avoids gaps between sentences. Kokoro handles multi-sentence text
-      // natively and produces seamless audio.
-      const result = tts.synthesize(text);
-      const totalSamples = result.samples.length;
-      const sampleRate = result.sampleRate;
-      const playResult = await playback.play(result.samples, result.sampleRate);
-      const interrupted = playResult.interrupted;
+      // Split into sentences for pipelined synthesis.
+      // Sentence 1: synthesize on main thread and start playing immediately.
+      // Remaining sentences: synthesize on main thread while sentence 1 plays,
+      // then concatenate and play. This reduces time-to-first-audio.
+      const sentences = text
+        .split(/(?<=[.!?])\s+/)
+        .map(s => s.trim())
+        .filter(s => s.length > 0);
+
+      let totalSamples = 0;
+      let sampleRate = 24000;
+      let interrupted = false;
+
+      if (sentences.length <= 1) {
+        // Single sentence — just synthesize and play
+        const result = tts.synthesize(text);
+        totalSamples = result.samples.length;
+        sampleRate = result.sampleRate;
+        const playResult = await playback.play(result.samples, result.sampleRate);
+        interrupted = playResult.interrupted;
+      } else {
+        // Pipelined: synthesize first sentence, start playing it, then
+        // synthesize the rest and play them after.
+        const firstResult = tts.synthesize(sentences[0]);
+        sampleRate = firstResult.sampleRate;
+        totalSamples += firstResult.samples.length;
+
+        // Start playing first sentence (non-blocking via promise)
+        const firstPlayPromise = playback.play(firstResult.samples, firstResult.sampleRate);
+
+        // While first sentence plays, synthesize the rest
+        const restText = sentences.slice(1).join(' ');
+        const restResult = tts.synthesize(restText);
+        totalSamples += restResult.samples.length;
+
+        // Wait for first sentence to finish playing
+        const firstPlayResult = await firstPlayPromise;
+        if (firstPlayResult.interrupted) {
+          interrupted = true;
+        }
+
+        // Play the rest (if not interrupted)
+        if (!interrupted) {
+          const restPlayResult = await playback.play(restResult.samples, restResult.sampleRate);
+          interrupted = restPlayResult.interrupted;
+        }
+      }
 
       isSpeaking = false;
 
